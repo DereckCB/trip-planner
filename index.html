@@ -1,0 +1,2852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trip Planner - demo</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #111214; --surface: #18191c; --surface2: #1f2023;
+    --border: #2a2b2e; --accent: #5b6370;
+    --green: #4a7c59; --text: #d1d3d8; --muted: #565a61; --white: #e8eaed;
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f7f9; --surface: #ffffff; --surface2: #eceff3;
+    --border: #d7dbe1; --accent: #6b7480;
+    --green: #3f8a5b; --text: #23272e; --muted: #7b828c; --white: #10131a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+  .tab { display: none; }
+  .tab.active { display: block; }
+  .btn { background: var(--surface2); color: var(--text); border: 1px solid var(--border); padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; transition: opacity .15s; }
+  .btn:hover { opacity: .82; }
+  .btn.secondary { background: var(--surface2); }
+  .icon-btn { background: none; border: none; cursor: pointer; padding: 2px 5px; border-radius: 5px; color: var(--muted); font-size: 13px; }
+  .icon-btn:hover { background: var(--border); color: var(--text); }
+  .empty { text-align: center; padding: 32px; color: var(--muted); font-size: 13px; }
+
+  /* ── OPTION PICKER POPOVER ── */
+  .state-menu { position: absolute; z-index: 300; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.45); min-width: 132px; }
+  .state-menu button { display: flex; align-items: center; gap: 9px; width: 100%; background: none; border: none; color: var(--text); font-size: 12px; font-weight: 600; padding: 7px 10px; border-radius: 6px; cursor: pointer; text-align: left; white-space: nowrap; }
+  .state-menu button:hover { background: var(--surface2); }
+  .state-menu button.cur { color: var(--white); }
+  .state-menu button.cur::after { content: '✓'; margin-left: auto; color: var(--muted); font-size: 11px; }
+  .state-menu .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── KANBAN BOARD ──
+     No column bubble: a colored phase header with the trip cards stacked below it. */
+  .kanban { display: flex; gap: 12px; align-items: flex-start; }
+  .kcol { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .kcol-head { padding: 3px 2px 7px; font-size: 11.5px; font-weight: 700; color: var(--kc, var(--text)); border-bottom: 2px solid var(--kc, var(--border)); display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .kcol .kcnt { background: none; color: var(--muted); padding: 0 2px; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+  .kcol-body { display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
+  .kcol-empty { color: var(--muted); font-size: 11px; text-align: center; padding: 12px 4px; font-style: italic; }
+  /* On phones, let the board scroll sideways with readable columns. */
+  @media (max-width: 680px) {
+    .kanban { overflow-x: auto; padding-bottom: 10px; }
+    .kcol { flex: 0 0 200px; }
+  }
+  /* Drag & drop */
+  .dragging { opacity: .4; }
+  /* A trip being dragged between Upcoming and Planned: the target section lights up. */
+  .saved-list.drop-hot { outline: 2px dashed var(--green); outline-offset: 4px; border-radius: 12px;
+                         background: color-mix(in srgb, var(--green) 7%, transparent); }
+  #dateModalBg .modal { width: min(400px, calc(100vw - 32px)); }
+  .dt-end { margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .kcol-body.drop-hot { outline: 2px dashed var(--accent); outline-offset: 3px; border-radius: 8px; }
+
+  /* ── IDEAS BACKLOG + ARCHIVE ── */
+  .saved-section { margin-top: 26px; }
+  .saved-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 8px; }
+  .saved-head-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+                        justify-content: flex-end; text-transform: none; letter-spacing: 0; }
+  .sort-lbl { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; }
+  .saved-sort { width: auto; padding: 6px 8px; font-size: 12px; height: 32px; }
+  .saved-list { display: flex; flex-direction: column; gap: 6px; min-height: 40px; padding: 0; }
+  .saved-cards { display: flex; flex-direction: column; gap: 8px; }
+  .saved-list .kcol-empty { padding: 14px; }
+  .backlog-card { padding: 8px 11px; }
+  .backlog-card.flagged { background: color-mix(in srgb, #c79a4a 13%, var(--surface)); }
+  .backlog-card.flagged:hover { background: color-mix(in srgb, #c79a4a 20%, var(--surface)); }
+  .flag-btn { opacity: .5; }
+  .flag-btn.on { opacity: 1; }
+  .bc-role { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+  .bc-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+  .saved-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; background: var(--surface); border: none; border-radius: 6px; cursor: pointer; }
+  .saved-row:hover { background: var(--surface2); }
+  .sv-main { flex: 1; min-width: 0; }
+  .sv-line1 { display: block; line-height: 1.4; }
+  .sv-co { font-weight: 700; color: var(--white); font-size: 13px; }
+  .sv-role { color: var(--text); font-size: 12px; margin-left: 6px; }
+  .sv-actions { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+  .sv-actions .icon-btn { font-size: 12px; padding: 1px 4px; }
+  .archive-head { cursor: pointer; user-select: none; align-items: center; }
+  .archive-head:hover { color: var(--text); }
+  .arch-arrow { display: inline-block; width: 12px; font-size: 10px; color: var(--muted); }
+  .arch-hint { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 10px; color: var(--muted); }
+  .archive-list .saved-row { opacity: .62; }
+  .archive-list .saved-row:hover { opacity: 1; }
+
+  /* ── SHARED FLAT LABELS (chips, badges, pills) ── */
+  .jc-chip { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 20px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+  .jc-chip.mode { color: var(--text); border-color: var(--accent); }
+  .jc-chip.loc { color: var(--text); }
+  .jc-chip.salary { background: #22301a; color: #a8cf7a; border-color: #3a4a26; }
+  .jc-chip.benefit { background: #14241a; color: #6cc98a; border-color: #22402c; }
+  .jc-chip.over { background: #2b1a1a; color: #d18a8a; border-color: #4a2828; }
+  .jc-chip.people { background: #1e2632; color: #9db4d6; border-color: #2c3646; }
+  :root[data-theme="light"] .jc-chip.benefit { background: #e4f3e9; color: #2f7a4a; border-color: #bfe0cb; }
+  :root[data-theme="light"] .jc-chip.salary { background: #eef3e2; color: #55702a; border-color: #d0dcb4; }
+  :root[data-theme="light"] .jc-chip.over { background: #f7e6e6; color: #a34c4c; border-color: #e3c4c4; }
+  :root[data-theme="light"] .jc-chip.people { background: #e7edf6; color: #3d5c88; border-color: #c8d6e8; }
+  .status-badge { display: inline-flex; align-items: center; padding: 0; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: opacity .15s; background: none; border: none; }
+  .status-badge:hover { opacity: .7; }
+  .jc-pri { cursor: pointer; border-radius: 4px; padding: 0 3px; }
+  .jc-pri:hover { background: var(--surface); }
+  .p-high   { color: #9a8a7a; font-weight: 600; }
+  .p-medium { color: #7a7a6a; font-weight: 600; }
+  .p-low    { color: var(--muted); }
+  .date-pill { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px); background: #22252a; color: #e8eaed; border: 1px solid var(--border); padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .25s; z-index: 100; box-shadow: 0 6px 24px rgba(0,0,0,.4); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── TRIP CARDS ──
+     Flat language: no filled chips, each trip is its own subtly-tinted box, no big enclosing rectangle. */
+  .trip-card { background: var(--surface); border: none; border-radius: 6px; padding: 10px 11px; overflow: hidden; cursor: grab; }
+  .trip-card:active { cursor: grabbing; }
+  .trip-card:hover { background: var(--surface2); }
+  .trip-card.flagged { box-shadow: inset 2px 0 0 #d4a63a; }
+  .trip-card.dragging { opacity: .5; }
+  .tc-top { display: flex; align-items: flex-start; gap: 8px; }
+  .tc-head-left { flex: 1; min-width: 0; }
+  .tc-dest { font-weight: 700; font-size: 14px; color: var(--white); overflow-wrap: anywhere; }
+  .tc-name { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.3; overflow-wrap: anywhere; }
+  /* Clamp long trip names to 2 lines with … ; show the full name on hover. */
+  .tc-name, .bc-role { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .trip-card:hover .tc-name, .trip-card:hover .bc-role { -webkit-line-clamp: unset; overflow: visible; }
+  .tc-rank { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; margin-left: auto; flex-shrink: 0; text-align: right; }
+  .tc-rank .jc-pri { font-size: 10px; }
+  .tc-count { font-size: 10px; font-weight: 800; white-space: nowrap; color: var(--muted); }
+  .tc-count.soon { color: #c79a4a; }
+  .tc-count.now  { color: #5fbf80; }
+  .tc-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 4px; }
+  .trip-card .status-badge { margin: 6px 0 2px; }
+  .tc-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; max-width: 100%; }
+  .tc-prog { margin-top: 8px; }
+  .tc-prog-lbl { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-bottom: 3px; }
+  .tc-prog-bar { height: 4px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+  .tc-prog-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width .3s; }
+  .tc-notes { font-size: 12px; color: var(--muted); margin-top: 7px; line-height: 1.5; }
+  .tc-actions { display: flex; gap: 2px; justify-content: flex-end; margin-top: 4px; }
+  /* Kanban cards stay compact until hovered (phones keep them expanded) */
+  @media (hover: hover) {
+    .kcol .trip-card .tc-chips,
+    .kcol .trip-card .tc-notes,
+    .kcol .trip-card .tc-actions { display: none; }
+    .kcol .trip-card:hover .tc-chips { display: flex; }
+    .kcol .trip-card:hover .tc-notes { display: block; }
+    .kcol .trip-card:hover .tc-actions { display: flex; }
+  }
+  .trip-card.backlog-card .tc-bottom { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .trip-card.backlog-card .tc-bottom .tc-actions { margin-top: 0; margin-left: auto; flex-shrink: 0; }
+  .trip-hint { color: var(--muted); font-size: 12px; padding: 10px 2px 0; }
+
+  /* ── PHOTO TILES ──
+     Every trip is a square photo. Destination, dates and budget always readable on the
+     photo; the rest slides up on hover. Tap opens the card on touch (no hover there). */
+  .trip-tile { position: relative; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden;
+               background: var(--surface2); cursor: grab; isolation: isolate; }
+  .trip-tile:active { cursor: grabbing; }
+  .trip-tile.dragging { opacity: .5; }
+  .trip-tile.flagged { box-shadow: 0 0 0 2px #d4a63a inset; }
+  .tt-img { position: absolute; inset: 0; background-size: cover; background-position: center; transition: transform .45s ease; }
+  .trip-tile:hover .tt-img { transform: scale(1.06); }
+  /* No photo yet: a calm tinted panel carrying the destination initials. */
+  .tt-img.tt-none { display: flex; align-items: center; justify-content: center;
+                    background: linear-gradient(150deg, var(--surface2), var(--surface)); }
+  .tt-initials { font-size: 34px; font-weight: 800; color: var(--muted); opacity: .5; letter-spacing: .05em; }
+  .tt-scrim { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.86) 0%, rgba(0,0,0,.45) 34%, rgba(0,0,0,.12) 62%, rgba(0,0,0,.30) 100%); }
+  .tt-top { position: absolute; top: 7px; left: 9px; right: 9px; display: flex; align-items: flex-start; gap: 6px; }
+  /* Kind sits top-left, status top-right with the countdown directly under it. */
+  .tt-kind { font-size: 9.5px; font-weight: 700; color: #dfe3e8; cursor: pointer; white-space: nowrap;
+             background: rgba(0,0,0,.42); border-radius: 20px; padding: 2px 7px; backdrop-filter: blur(2px); }
+  .tt-kind:hover { background: rgba(0,0,0,.62); }
+  .tt-top .tt-right { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .tt-status { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+               cursor: pointer; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+  .tt-count { font-size: 10px; font-weight: 700; color: #dfe3e8; text-shadow: 0 1px 3px rgba(0,0,0,.85); white-space: nowrap; }
+  .tt-count.soon { color: #f0c073; }
+  .tt-count.now { color: #7fe0a0; }
+  .tt-base { position: absolute; left: 10px; right: 10px; bottom: 9px; color: #fff; }
+  .tt-dest { font-size: 15px; font-weight: 800; line-height: 1.15; text-shadow: 0 1px 4px rgba(0,0,0,.75); overflow-wrap: anywhere; }
+  .tt-name { font-size: 11px; color: #dfe3e8; margin-top: 1px; text-shadow: 0 1px 3px rgba(0,0,0,.75);
+             display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .tt-dates { font-size: 10.5px; font-weight: 700; color: #e2e6ea; margin-top: 4px; text-shadow: 0 1px 3px rgba(0,0,0,.85); }
+  /* Money reads as a bar: how much of the budget is already gone. */
+  .tt-money { margin-top: 5px; }
+  .tt-money-top { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; font-weight: 700;
+                  text-shadow: 0 1px 3px rgba(0,0,0,.85); }
+  .tt-money .tt-budget { color: #e2e6ea; }
+  .tt-money .tt-left { color: #a8d98a; }
+  .tt-money .tt-over { color: #e79a9a; }
+  .tt-money .tt-spent { color: #a8d98a; font-size: 10.5px; font-weight: 700; }
+  .tt-money-bar { height: 3px; margin-top: 3px; border-radius: 3px; background: rgba(255,255,255,.25); overflow: hidden; }
+  .tt-money-fill { height: 100%; background: #8fc96f; border-radius: 3px; }
+  .tt-money-fill.over { background: #d97b7b; }
+  /* Want score, 1 to 10. */
+  .want-dot { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center;
+              justify-content: center; font-size: 11.5px; font-weight: 800; cursor: pointer;
+              background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.22); color: #fff; }
+  .want-dot:hover { background: rgba(255,255,255,.20); }
+  .tt-h-head { display: flex; align-items: flex-start; gap: 8px; }
+  .tt-h-head > div { flex: 1; min-width: 0; }
+  /* Hover panel: the full trip, over the photo. */
+  .tt-hover { position: absolute; inset: 0; padding: 10px; display: flex; flex-direction: column; gap: 6px;
+              background: linear-gradient(to top, rgba(10,12,15,.97), rgba(10,12,15,.95));
+              opacity: 0; transition: opacity .18s ease; overflow: hidden; }
+  .tt-hover .tt-h-dest { font-size: 13px; font-weight: 800; color: #fff; }
+  .tt-hover .tt-h-sub { font-size: 10.5px; color: #b9c0c8; margin-top: -3px; }
+  .tt-hover .tc-chips { margin-top: 2px; gap: 4px; }
+  .tt-hover .jc-chip { font-size: 9.5px; padding: 1px 6px; }
+  .tt-itin { font-size: 10.5px; color: #cdd3da; line-height: 1.45; overflow: hidden; min-height: 0; }
+  .tt-itin .ti-line { display: flex; gap: 5px; }
+  .tt-itin .ti-when { color: #8d96a1; font-weight: 700; white-space: nowrap; }
+  .tt-itin .ti-more { color: #8d96a1; font-style: italic; }
+  /* The short description: the one line that says what this trip actually is. */
+  /* The description gets its lines first; the itinerary preview is what gives way. */
+  .tt-hover .tt-desc { font-size: 10.5px; color: #c3cad2; line-height: 1.45; flex-shrink: 0;
+                       display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .tt-hover .tc-prog { margin-top: auto; }
+  .tt-hover .tc-prog-lbl { color: #9aa3ad; }
+  .tt-hover .tc-prog-bar { background: rgba(255,255,255,.15); }
+  /* Actions go left on hover so they never sit under the day count in the corner. */
+  .tt-hover .tc-actions { margin-top: 4px; justify-content: flex-start; padding-right: 54px; }
+  .tt-hover .icon-btn { color: #b9c0c8; }
+  .tt-hover .icon-btn:hover { background: rgba(255,255,255,.14); color: #fff; }
+  @media (hover: hover) {
+    .trip-tile:hover .tt-hover { opacity: 1; }
+  }
+  @media (hover: none) {
+    /* No hover on touch: the photo keeps its base facts and a tap opens the card. */
+    .tt-hover { display: none; }
+  }
+  /* How many days the trip lasts, bottom-right corner. Sits above the hover panel
+     (last child, own z-index) so it stays readable whether or not you are hovering. */
+  .tt-days { position: absolute; right: 9px; bottom: 9px; z-index: 3; font-size: 10px; font-weight: 800;
+             color: #fff; white-space: nowrap; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.20);
+             border-radius: 20px; padding: 2px 8px; backdrop-filter: blur(2px); }
+  /* Keep the last line of the base block clear of that badge. */
+  .tt-base.has-days > :last-child { padding-right: 60px; }
+  .trip-tile.photo-hot { box-shadow: 0 0 0 2px var(--green) inset; }
+  /* Ideas backlog: the same square tiles, in a grid. */
+  .saved-list.tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(267px, 1fr)); gap: 12px; }
+
+  /* ── BOARD TOOLS ──
+     Search, sort and + Trip all sit in the Planned trips head. That head is static markup and
+     buildTripList only fills #plannedList, so typing in the search never loses the caret. */
+  .board-hint { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 14px; }
+  .board-hint b { color: var(--text); font-weight: 700; }
+  .qa-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .qa-hint { font-size: 11px; color: var(--muted); }
+  /* Kind filter on Planned trips: flat text tabs, underlined when on. */
+  .kind-filter { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: -2px 0 11px; }
+  .kind-chip { background: none; border: none; padding: 2px 0; font-family: inherit; font-size: 11.5px;
+               font-weight: 700; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; }
+  .kind-chip:hover { color: var(--text); }
+  .kind-chip.on { color: var(--white); border-bottom-color: var(--accent); }
+  .kind-chip .kf-n { font-weight: 600; opacity: .65; margin-left: 4px; }
+  .trip-search { display: flex; align-items: center; gap: 5px; border-bottom: 1px solid var(--border); padding: 1px 2px 4px; transition: border-color .15s; align-self: center; }
+  .trip-search:focus-within, .trip-search.on { border-bottom-color: var(--accent); }
+  .trip-search svg { width: 13px; height: 13px; color: var(--muted); flex-shrink: 0; }
+  .trip-search.on svg { color: var(--accent); }
+  .trip-search input { width: 160px; background: none; border: none; padding: 0; color: var(--text); font-size: 12.5px; font-weight: 600; outline: none; }
+  .trip-search .ss-clear { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 14px; line-height: 1; padding: 0 1px; }
+  .search-note { font-size: 11px; color: var(--muted); margin: -6px 0 12px; }
+  .search-note[hidden] { display: none; }
+
+  /* The stacked ideas pool and day blocks became the kanban further down (.pk-*).
+     Only the "no dates yet" line survives from that layout. */
+  .plan-nodays { font-size: 11.5px; color: var(--muted); font-style: italic; padding: 6px 2px; }
+  /* Preparation groups who / how / what it costs, so the sub-groups need a little air. */
+  .prep-row { margin-top: 10px; }
+
+  /* ── ITINERARY EDITOR (modal): a timeline, not a table ── */
+  .itin-list { position: relative; padding-left: 14px; margin-bottom: 10px; }
+  .itin-list::before { content: ""; position: absolute; left: 3px; top: 8px; bottom: 8px; width: 2px; background: var(--border); border-radius: 2px; }
+  .itin-row { display: flex; gap: 8px; align-items: center; margin-bottom: 7px; position: relative; }
+  .itin-dot { position: absolute; left: -14px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px;
+              border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--surface); }
+  .itin-fields { flex: 1; min-width: 0; display: flex; gap: 6px; }
+  .itin-row .itin-when { width: 116px; flex-shrink: 0; font-weight: 700; }
+  .itin-row .itin-what { flex: 1; min-width: 0; }
+  .itin-tools { display: flex; flex-shrink: 0; }
+  .itin-tools .icon-btn:disabled { opacity: .3; cursor: default; }
+  .itin-empty { font-size: 12px; color: var(--muted); font-style: italic; padding: 2px 0 8px; }
+  .ti-add-row { display: flex; align-items: center; gap: 10px; margin-top: 7px; }
+  .ti-count { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  /* Who is coming, as removable tags. */
+  .tag-box { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; min-height: 24px; }
+  .tag { display: inline-flex; align-items: center; gap: 5px; background: var(--surface2); border: 1px solid var(--border);
+         border-radius: 20px; padding: 3px 6px 3px 10px; font-size: 12px; font-weight: 600; color: var(--text); }
+  .tag button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 11px; padding: 0 2px; line-height: 1; }
+  .tag button:hover { color: var(--text); }
+  .tag-empty { font-size: 12px; color: var(--muted); font-style: italic; }
+  /* Live budget preview in the modal. (The want slider is gone: Importance is a
+     select up in the head row now, beside kind, status and the dates.) */
+  .budget-preview { margin-top: 10px; }
+  .budget-preview .tt-money-top { text-shadow: none; color: var(--text); }
+  .budget-preview .tt-money-bar { background: var(--border); }
+  .budget-preview .tt-budget { color: var(--text); }
+  .photo-box { display: flex; gap: 12px; align-items: flex-start; }
+  .photo-prev { width: 108px; height: 108px; border-radius: 8px; background: var(--surface2); background-size: cover;
+                background-position: center; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+                color: var(--muted); font-size: 11px; text-align: center; padding: 6px; }
+  .photo-ctl { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+  .photo-ctl .qa-hint { margin-top: -2px; }
+
+  /* ── MODAL ── */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100; align-items: center; justify-content: center; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 460px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow-y: auto; }
+  /* ── TRIP CARD: FITS THE WINDOW ──
+     The card is as tall as the viewport allows, never taller. Title and Save stay pinned;
+     only the middle scrolls, and it is laid out in two columns so the whole trip is visible
+     at once instead of being one long ribbon you have to scroll through. */
+  #tripModalBg .modal { width: min(1280px, calc(100vw - 24px)); height: min(880px, calc(100vh - 24px));
+                        max-width: none; max-height: none; padding: 0; overflow: hidden;
+                        display: flex; flex-direction: column; }
+  /* One compact row: title, then kind / status / dates at reduced size, then the countdown.
+     Two rows here cost the body about 55px of height, which is what forced it to scroll. */
+  .tm-head { flex-shrink: 0; padding: 11px 20px 10px; border-bottom: 1px solid var(--border);
+             display: flex; align-items: center; gap: 18px; }
+  .tm-head .jm-title { flex: 1 1 200px; min-width: 150px; }
+  .tm-head .jm-company { font-size: 17px; }
+  .tm-head .jm-role { font-size: 12.5px; margin-top: 0; }
+  .tm-head .jm-meta-row { flex: 0 1 auto; gap: 8px; grid-template-columns: 96px 88px 124px 126px 126px 58px; }
+  /* Importance is 1 to 5, picked directly instead of opened as a list. */
+  .seg { display: flex; gap: 2px; }
+  .seg button { flex: 1; background: none; border: 1px solid var(--border); color: var(--muted);
+                font-family: inherit; font-size: 11.5px; font-weight: 700; padding: 3px 0; cursor: pointer;
+                border-radius: 0; }
+  .seg button:first-child { border-radius: 6px 0 0 6px; }
+  .seg button:last-child { border-radius: 0 6px 6px 0; }
+  .seg button:hover { color: var(--text); }
+  .seg button.on { color: var(--white); border-color: var(--green);
+                   background: color-mix(in srgb, var(--green) 22%, transparent); }
+  .tm-head .jm-meta-row label { font-size: 9.5px; margin-bottom: 2px; }
+  .tm-head .jm-meta-row select,
+  .tm-head .jm-meta-row input { padding: 4px 7px; font-size: 12px; border-radius: 6px; }
+  .tm-head .jm-fitbig { flex-shrink: 0; }
+  .tm-head .countbig { font-size: 17px; }
+  @media (max-width: 1080px) {
+    .tm-head { flex-wrap: wrap; gap: 10px 16px; }
+    .tm-head .jm-title { flex-basis: 100%; }
+  }
+  /* ── THE CARD IS THREE TABS ──────────────────────────────────────────────
+     Summary (what it is + the plan), Preparation (who/how/cost + checklist) and
+     Links. Each pane owns its own height and scrolls inside itself, so the card
+     itself never grows a scrollbar however big the trip gets. */
+  .tm-tabs { display: flex; gap: 2px; padding: 0 22px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .tm-tab { background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+            padding: 7px 13px; font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--muted);
+            cursor: pointer; white-space: nowrap; }
+  .tm-tab:hover { color: var(--text); }
+  .tm-tab.on { color: var(--white); border-bottom-color: var(--green); }
+  .tm-tab .tb-n { font-weight: 600; opacity: .6; margin-left: 5px; }
+  .tm-body { flex: 1; min-height: 0; overflow: hidden; padding: 2px 22px 16px; display: flex; }
+  .tm-pane { display: none; }
+  .tm-pane.on { display: flex; flex: 1; min-width: 0; min-height: 0; }
+  /* Summary: the card block on top, then the plan taking whatever height is left. */
+  #tpane-summary.on { flex-direction: column; }
+  #tpane-summary .jm-section:first-child { flex-shrink: 0; }
+  #tpane-summary .plan-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  /* Preparation: two columns, and each one scrolls on its own. */
+  #tpane-prep.on { gap: 0 26px; }
+  #tpane-prep .tm-col { flex: 1; min-width: 0; overflow-y: auto; }
+  #tpane-links.on { flex-direction: column; }
+  .tm-col { min-width: 0; }
+  .tm-body .jm-section { padding-top: 9px; margin-top: 11px; }
+  .tm-col > .jm-section:first-child { border-top: none; padding-top: 0; margin-top: 13px; }
+  .tm-body textarea { min-height: 46px; }
+  /* Photo and description share one block: preview on the left, description + controls right. */
+  .tm-col .photo-box { gap: 10px; }
+  .tm-col .photo-prev { width: 92px; height: 92px; }
+  .tm-col .photo-ctl { gap: 6px; }
+  .tm-col .photo-ctl textarea { min-height: 44px; }
+  .tm-col .photo-ctl .qa-row { margin-top: 0; }
+  .tm-col .photo-ctl .btn { padding: 4px 10px; font-size: 11.5px; }
+  .tm-col .itin-row .itin-when { width: 88px; }
+  .tm-col .itin-fields { flex-wrap: wrap; }
+  .tm-foot { flex-shrink: 0; padding: 11px 22px; border-top: 1px solid var(--border); background: var(--surface); }
+  .tm-foot .modal-actions { margin-top: 0; }
+  /* ── THE PLAN, AS A KANBAN ────────────────────────────────────────────────
+     The backlog of activities across the top, one column per day underneath.
+     Same drag protocol as before (dragPlanId), the columns just replaced the
+     stacked day blocks. Columns scroll sideways; the card does not. */
+  .pk-bar { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-bottom: 7px; }
+  .pk-bar .ti-add { flex: 1; margin: 0; }
+  .pk-backlog { flex-shrink: 0; border: 1px solid var(--border); border-radius: 9px;
+                background: var(--surface2); padding: 7px 9px 8px; margin-bottom: 9px;
+                max-height: 148px; overflow-y: auto; }
+  .pk-backlog.drop-on { border-color: var(--green); background: color-mix(in srgb, var(--green) 12%, var(--surface)); }
+  /* No dates yet means no day columns, so the backlog gets the whole pane instead of
+     scrolling inside 148px with empty space under it. */
+  .pk-backlog.solo { max-height: none; flex: 1; min-height: 0; }
+  .pk-backlog .pk-cards { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pk-backlog .pk-card { width: 208px; }
+  .pk-cols { flex: 1; min-height: 0; display: flex; gap: 9px; overflow-x: auto; overflow-y: hidden; padding-bottom: 5px; }
+  .pk-cols::-webkit-scrollbar, .pk-backlog::-webkit-scrollbar, .pk-body::-webkit-scrollbar { height: 6px; width: 6px; }
+  .pk-cols::-webkit-scrollbar-thumb, .pk-backlog::-webkit-scrollbar-thumb, .pk-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  /* One colour per day, same idea as the job board's stage columns (--kc drives the head
+     rule and every card's left edge), in the same muted register as the rest of the suite. */
+  /* min-width:0 all the way down, or a single long unbreakable title sets the column's
+     min-content width and blows it out from 206px to whatever the text measures. */
+  .pk-col { flex: 0 0 206px; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+            border: 1px solid var(--border); border-radius: 9px; padding: 6px 7px 7px;
+            background: color-mix(in srgb, var(--kc, var(--accent)) 6%, transparent); }
+  .pk-col.drop-on { border-color: var(--kc, var(--green));
+                    background: color-mix(in srgb, var(--kc, var(--green)) 18%, var(--surface)); }
+  .pk-head { display: flex; align-items: baseline; gap: 6px; flex-shrink: 0; margin-bottom: 6px;
+             padding-bottom: 4px; border-bottom: 2px solid var(--kc, var(--border));
+             font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+             color: var(--kc, var(--muted)); }
+  .pk-head .pk-n { color: var(--kc, var(--text)); }
+  .pk-head .pk-date { text-transform: none; letter-spacing: 0; font-weight: 600; }
+  .pk-head .pk-count { margin-left: auto; font-weight: 700; opacity: .7; }
+  .pk-body { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; padding-right: 2px; }
+  /* An activity is ONE LINE: the title, then where and how long in dimmer text after it,
+     all of it clipped rather than wrapped. The detail lives in the hover panel. The left
+     edge carries the day's colour, which is what makes a column readable at a glance. */
+  .pk-card { display: flex; align-items: center; gap: 6px;
+             background: var(--surface); border: 1px solid var(--border);
+             border-left: 3px solid var(--kc, var(--accent)); border-radius: 6px;
+             padding: 4px 4px 4px 7px; margin-bottom: 4px; cursor: grab; min-width: 0; }
+  .pk-card:hover { border-color: var(--accent); border-left-color: var(--kc, var(--accent));
+                   background: color-mix(in srgb, var(--kc, var(--accent)) 10%, var(--surface)); }
+  .pk-card.dragging { opacity: .45; }
+  .pk-card.drop-here { border-top: 2px solid var(--green); }
+  .pk-card .pk-line { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                      font-size: 11.5px; line-height: 1.5; color: var(--text); }
+  .pk-card .pk-line b { font-weight: 600; }
+  .pk-card .pk-line .pk-meta { color: var(--muted); font-size: 10.5px; }
+  .pk-card .pk-x { flex-shrink: 0; opacity: 0; background: none; border: none;
+                   color: var(--muted); font-size: 11px; cursor: pointer; padding: 1px 3px; line-height: 1; }
+  .pk-card:hover .pk-x { opacity: 1; }
+  .pk-card .pk-x:hover { color: var(--text); }
+  .pk-empty { font-size: 10.5px; color: var(--muted); font-style: italic; padding: 3px 1px; }
+  /* Hover detail. Positioned in JS and parked on the modal root, because a popover
+     inside a scrolling column gets clipped by the column. */
+  .pk-tip { position: fixed; z-index: 220; width: 268px; max-width: calc(100vw - 20px);
+            background: var(--surface); border: 1px solid var(--accent); border-radius: 9px;
+            padding: 9px 11px 10px; box-shadow: 0 10px 26px rgba(0,0,0,.5); pointer-events: none; display: none; }
+  .pk-tip.on { display: block; }
+  .pk-tip .pt-what { font-size: 12.5px; font-weight: 800; color: var(--white); line-height: 1.3; }
+  .pk-tip .pt-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 5px; font-size: 10.5px; color: var(--muted); }
+  .pk-tip .pt-meta b { color: var(--text); font-weight: 700; }
+  .pk-tip .pt-desc { margin-top: 7px; font-size: 11.5px; color: var(--text); line-height: 1.45; white-space: pre-wrap; }
+  .pk-tip .pt-hint { margin-top: 7px; font-size: 10px; color: var(--muted); font-style: italic; }
+  /* The activity editor: a small card over the trip card. */
+  #actModalBg .modal { width: min(460px, calc(100vw - 32px)); }
+  #actModalBg { z-index: 210; }
+  .act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  /* ── LINKS ──
+     A row is the link: clicking it opens the page. Editing is deliberate, behind the
+     pencil, so the common case (go there) costs nothing and the rare case (fix the url)
+     is one click away. */
+  .lk-list { flex: 1; min-height: 0; overflow-y: auto; padding-right: 3px; }
+  .lk-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px;
+            border-bottom: 1px solid var(--border); border-radius: 7px; }
+  .lk-row:hover { background: var(--surface2); }
+  .lk-open { flex: 1; min-width: 0; display: block; text-decoration: none; padding: 1px 2px; }
+  .lk-open .lk-title { display: block; font-size: 12.5px; font-weight: 600; color: var(--text);
+                       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lk-open .lk-host { display: block; font-size: 10.5px; color: var(--green); margin-top: 1px;
+                      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lk-open:hover .lk-title { color: var(--white); }
+  .lk-open:hover .lk-host { text-decoration: underline; }
+  .lk-open.dead { pointer-events: none; }
+  .lk-open.dead .lk-host { color: var(--muted); font-style: italic; }
+  .lk-edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  /* The url line is short on purpose; the description sits under it. */
+  #tripModalBg .lk-edit input { padding: 3px 7px; font-size: 11.5px; height: 26px; border-radius: 6px; }
+  #tripModalBg .lk-edit .lk-note { font-size: 11.5px; }
+  .lk-empty { font-size: 12px; color: var(--muted); font-style: italic; padding: 10px 2px; }
+  /* Narrower windows step down to two columns, then to one. Head and foot stay pinned either way. */
+  @media (max-width: 900px) {
+    #tpane-prep.on { flex-direction: column; overflow-y: auto; }
+    #tpane-prep .tm-col { overflow: visible; }
+    .tm-col > .jm-section:first-child { border-top: 1px solid var(--border); padding-top: 9px; }
+    .tm-col:first-child > .jm-section:first-child { border-top: none; padding-top: 0; }
+  }
+  .modal h3 { font-size: 16px; margin-bottom: 18px; }
+  label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; letter-spacing: .04em; }
+  input, select, textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; color: var(--text); font-size: 13px; font-family: inherit; }
+  input[type=checkbox], input[type=radio] { width: auto; padding: 0; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 56px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+  /* .jm-head is unused since the trip card head became one flex row - see .tm-head. */
+  .jm-title { flex: 1; min-width: 0; }
+  .jm-company { font-size: 20px; font-weight: 800; color: var(--white); background: none; border: none; border-bottom: 1px solid transparent; padding: 2px 0; width: 100%; }
+  .jm-role { font-size: 14px; color: var(--text); background: none; border: none; border-bottom: 1px solid transparent; padding: 2px 0; width: 100%; margin-top: 2px; }
+  .jm-company:focus, .jm-role:focus { outline: none; border-bottom-color: var(--accent); }
+  .jm-company::placeholder, .jm-role::placeholder { color: var(--muted); }
+  .jm-fitbig { text-align: right; flex-shrink: 0; }
+  .countbig { display: inline-flex; align-items: center; font-size: 20px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+  .countbig.c-now  { color: #5fbf80; }
+  .countbig.c-soon { color: #c79a4a; }
+  .fitbig-sub { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+  .jm-meta-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .jm-section { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 14px; }
+  .jm-sec-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--text); margin-bottom: 8px; }
+  .jm-hint { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 11px; color: var(--muted); }
+  .jm-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .jm-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 580px) { .jm-meta-row, .jm-grid3, .jm-grid2 { grid-template-columns: 1fr 1fr; } }
+  .jm-addbtn { background: none; border: 1px dashed var(--border); color: var(--muted); font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 7px; cursor: pointer; margin-top: 4px; }
+  .jm-addbtn:hover { color: var(--text); border-color: var(--accent); }
+
+  /* Trip modal: To do / Done board */
+  .ti-board { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+  @media (max-width: 580px) { .ti-board { grid-template-columns: 1fr; } }
+  .ti-col-head { display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding-bottom: 6px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .ti-col.todo .ti-col-head { color: #8fa3bd; border-bottom-color: #2f3a48; }
+  .ti-col.done .ti-col-head { color: #5fbf80; border-bottom-color: #244a30; }
+  .ti-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin-bottom: 6px; border-radius: 6px; background: var(--surface2); }
+  .ti-row input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; }
+  .ti-txt { flex: 1; min-width: 0; background: none; border: none; color: var(--text); font-size: 12.5px; padding: 0; }
+  .ti-txt:focus { outline: none; }
+  .ti-row.is-done .ti-txt { color: var(--muted); text-decoration: line-through; }
+  .ti-empty { color: var(--muted); font-size: 11px; font-style: italic; padding: 6px 4px; }
+  .ti-add { display: flex; gap: 8px; margin-top: 12px; }
+  .ti-add input { flex: 1; }
+  .ti-add .jm-addbtn { margin-top: 0; flex-shrink: 0; }
+
+  /* ── AUTH ── */
+  .auth-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .auth-box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 340px; max-width: 100%; }
+  .auth-box h2 { font-size: 22px; color: var(--white); margin-bottom: 4px; }
+  .auth-sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  .auth-box input { width: 100%; margin-bottom: 10px; }
+  .auth-box .btn { width: 100%; margin-top: 6px; padding: 10px; }
+  .auth-error { color: #c98a6a; font-size: 12px; min-height: 15px; margin: 2px 0 6px; }
+  .auth-local { background: none; border: none; color: var(--muted); font-size: 11px; text-decoration: underline; cursor: pointer; width: 100%; margin-top: 12px; font-family: inherit; }
+  .auth-local:hover { color: var(--text); }
+
+  .demo-note { background: color-mix(in srgb, #c79a4a 14%, var(--surface)); border: 1px solid color-mix(in srgb, #c79a4a 34%, var(--border)); color: var(--text); border-radius: 10px; padding: 10px 13px; font-size: 12px; line-height: 1.5; margin-bottom: 16px; }
+  .demo-note b { color: var(--white); }
+  .demo-note a { color: var(--accent); }
+  /* ── App shell + left sidebar (icon nav, hover-expand) ── */
+  /* Left menu + hub flyout (shared block - keep identical in every app) */
+  a.side-btn { text-decoration: none; }
+  .side-sep { height: 1px; background: var(--border); margin: 6px 10px; }
+  /* Icon-only rail: fixed width, the label shows as a tooltip on hover. */
+  .side-btn { justify-content: center; padding: 9px; position: relative; }
+  .side-btn[data-tip]:hover::after, .side-btn[data-tip]:focus-visible::after {
+    content: attr(data-tip); position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%);
+    background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 7px;
+    padding: 5px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; z-index: 200;
+    box-shadow: 0 8px 22px rgba(0,0,0,.35); pointer-events: none; }
+  .hub-btn { color: var(--text); }
+  .hub-flyout { position: fixed; z-index: 90; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 6px; min-width: 178px; box-shadow: 0 14px 40px rgba(0,0,0,.45); display: flex; flex-direction: column; gap: 2px; }
+  .hub-flyout[hidden] { display: none; }
+  .hub-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px; color: var(--text); text-decoration: none; font-size: 13px; font-weight: 500; white-space: nowrap; }
+  .hub-item:hover { background: var(--surface2); color: var(--white); }
+  .hub-item .hi { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .hub-item .hi svg { width: 17px; height: 17px; display: block; }
+  .hub-item.is-current { color: var(--white); background: var(--surface2); cursor: default; }
+  .hub-item.is-current .here { margin-left: auto; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  /* Pages inside an app */
+  .view { display: none; }
+  .view.active { display: block; }
+  .app-shell { display: flex; min-height: 100vh; align-items: stretch; }
+  .sidebar { width: 54px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; padding: 12px 0; transition: width .16s ease; overflow: visible; z-index: 40; position: sticky; top: 0; height: 100vh; }
+  .side-nav, .side-foot { display: flex; flex-direction: column; gap: 3px; padding: 0 8px; }
+  .side-btn { display: flex; align-items: center; gap: 11px; width: 100%; background: none; border: none; color: var(--muted); font-size: 13px; font-weight: 500; letter-spacing: .01em; padding: 8px; border-radius: 8px; cursor: pointer; white-space: nowrap; text-align: left; }
+  .side-btn .si { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .side-btn .si svg { width: 19px; height: 19px; display: block; }
+  .side-btn:hover { background: var(--surface2); color: var(--text); }
+  .side-btn.active { color: var(--white); background: var(--surface2); }
+  main.content { flex: 1; min-width: 0; max-width: none; margin: 0; padding: 20px 24px; }
+  /* Settings popover (bottom-left) - minimalist, no icons, aligned text */
+  .settings-menu { position: fixed; left: 62px; bottom: 14px; z-index: 60; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 5px; min-width: 172px; box-shadow: 0 12px 40px rgba(0,0,0,.42); display: flex; flex-direction: column; gap: 1px; font-family: inherit; }
+  .settings-menu[hidden] { display: none; }
+  .settings-menu button { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--text); font-size: 13px; font-weight: 500; letter-spacing: .01em; padding: 8px 12px; border-radius: 7px; cursor: pointer; transition: background .1s; }
+  .settings-menu button:hover { background: var(--surface2); }
+  .settings-menu .sm-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+  .settings-menu .sm-danger { color: var(--muted); }
+  .settings-menu .sm-danger:hover { color: var(--white); }
+  /* Page title */
+  .content-head { margin: 0 0 14px; }
+  .app-title { font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: var(--white); margin: 0; }
+
+  /* ── PHONE (compact; keeps the desktop format unchanged) ── */
+  @media (max-width: 640px) {
+    body { font-size: 12px; }
+    main.content { padding: 12px 10px; }
+    .app-title { font-size: 16px; }
+    .btn { font-size: 11px; padding: 5px 10px; }
+    .trip-card { padding: 10px 11px; }
+    .tc-dest { font-size: 12px; }
+    .tc-name, .tc-notes { font-size: 10px; }
+    .status-badge { font-size: 10px; }
+    .icon-btn { font-size: 15px; padding: 2px 4px; }
+  }
+  @media (max-width: 380px) {
+    body { font-size: 11px; }
+    .app-title { font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="authOverlay" class="auth-overlay">
+  <div class="auth-box">
+    <h2>Trips</h2>
+    <div class="auth-sub">Log in to sync your trips across devices</div>
+    <input id="auth-email" type="email" placeholder="Email" autocomplete="username">
+    <input id="auth-pass" type="password" placeholder="Password" autocomplete="current-password">
+    <div class="auth-error" id="authError"></div>
+    <button class="btn" onclick="doLogin()">Log in</button>
+    <button class="btn secondary" onclick="doSignup()">Create account</button>
+    <button class="auth-local" onclick="useLocalOnly()">Skip - use this device only</button>
+  </div>
+</div>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <nav class="side-nav" id="appNav"></nav>
+    <div class="side-foot">
+      <span id="syncBadge" hidden></span>
+      <button class="side-btn settings-btn" data-tip="Settings" onclick="toggleSettings(event)"><span class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9"/><path d="M17 7h3"/><circle cx="15" cy="7" r="2"/><path d="M4 17h3"/><path d="M11 17h9"/><circle cx="9" cy="17" r="2"/></svg></span></button>
+    </div>
+  </aside>
+
+  <main class="content">
+
+<div class="view active" id="view-board">
+  <div class="content-head"><h1 class="app-title">Trip Planner</h1></div>
+  <div class="demo-note"><b>Demo.</b> These trips are made up, and anything you change is saved only in this browser. Add Supabase keys to turn on accounts and cross-device sync.</div>
+
+  <span class="board-hint">Paste trip details anywhere on this page and a card opens filled in. <b>Ctrl+V</b></span>
+  <div class="search-note" id="searchNote" hidden></div>
+
+  <!-- The two section HEADS are static markup, and buildTripList only fills the lists inside
+       them. That is what lets the search box live next to the sort: the board re-renders on
+       every keystroke, and anything re-rendered would lose the caret. -->
+  <div class="saved-section">
+    <div class="saved-head">🧳 Upcoming <span class="kcnt" id="upCount">0</span></div>
+    <div class="saved-list tile-grid" id="upcomingList"
+         ondragover="tripSectionOver(event)" ondragleave="tripSectionLeave(event)" ondrop="dropOnUpcoming(event)"></div>
+  </div>
+
+  <div class="saved-section">
+    <div class="saved-head">📋 Planned trips <span class="kcnt" id="planCount">0</span>
+      <div class="saved-head-actions">
+        <div class="trip-search" id="tripSearchBox">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input id="tripSearch" type="search" placeholder="Search trips" oninput="setTripSearch(this.value)">
+          <button class="ss-clear" onclick="clearTripSearch()" title="Clear">✕</button>
+        </div>
+        <span class="sort-lbl">Sort</span>
+        <select class="saved-sort" id="tripSortSel" onchange="setTripSort(this.value)" title="Sort the planned trips">
+          <option value="want">Want it most</option>
+          <option value="date">Soonest first</option>
+          <option value="name">Destination A–Z</option>
+          <option value="newest">Recently added</option>
+        </select>
+        <button class="btn" onclick="openTripModal()">+ Trip</button>
+      </div>
+    </div>
+    <div class="kind-filter" id="kindFilter"></div>
+    <div class="saved-list tile-grid" id="plannedList"
+         ondragover="tripSectionOver(event)" ondragleave="tripSectionLeave(event)" ondrop="dropOnPlanned(event)"></div>
+  </div>
+
+  <div id="tripList"></div>
+</div>
+
+  </main>
+</div>
+
+<div id="settingsMenu" class="settings-menu" hidden>
+  <button onclick="exportBackup(); hideSettings()">Backup</button>
+  <button onclick="document.getElementById('restoreFile').click(); hideSettings()">Restore</button>
+  <button onclick="hideSettings(); openHistory(event)">History</button>
+  <button onclick="toggleTheme()"><span id="themeLabel">Light theme</span></button>
+  <div class="sm-sep"></div>
+  <button class="sm-danger" onclick="signOut()">Log out</button>
+  <input type="file" id="restoreFile" accept="application/json,.json" style="display:none" onchange="restoreBackup(this.files[0]); this.value=''">
+</div>
+
+<!-- Trip modal -->
+<div class="modal-bg" id="tripModalBg">
+  <div class="modal">
+    <!-- Head stays pinned: the facts you always want in sight while editing anything else.
+         One row, not two - kind / status / dates are compact so the body keeps the height. -->
+    <div class="tm-head">
+      <div class="jm-title">
+        <input class="jm-company" id="p-dest" placeholder="Destination">
+        <input class="jm-role" id="p-name" placeholder="Trip name - road trip Gaspésie, Christmas in Chile…">
+      </div>
+      <div class="jm-meta-row">
+        <div><label>Kind</label>
+          <select id="p-kind">
+            <option value="Travel">✈️ Travel</option>
+            <option value="Road trip">🚗 Road trip</option>
+            <option value="Event">🎟️ One-time event</option>
+          </select>
+        </div>
+        <div><label>Status</label>
+          <select id="p-status">
+            <option value="Planning">Planning</option>
+            <option value="Ready">Ready</option>
+            <option value="Done">Done</option>
+          </select>
+        </div>
+        <div><label>Importance</label>
+          <div class="seg" id="p-want-seg" title="5 is the one you would book tomorrow"></div>
+          <input type="hidden" id="p-want" value="3">
+        </div>
+        <div><label>Start</label><input id="p-start" type="date" oninput="startChanged()"></div>
+        <div><label>End</label><input id="p-end" type="date" oninput="endChanged()"></div>
+        <div><label>Days</label><input id="p-len" type="number" min="1" max="120" placeholder="5" oninput="lenChanged()"
+                                       title="How long it lasts. Fill any two of start / end / days and the third works itself out."></div>
+      </div>
+      <div class="jm-fitbig" id="p-countbig"></div>
+    </div>
+
+    <div class="tm-tabs">
+      <button type="button" class="tm-tab on" id="ttab-summary" onclick="showTripTab('summary')">Summary</button>
+      <button type="button" class="tm-tab" id="ttab-prep" onclick="showTripTab('prep')">Preparation<span class="tb-n" id="ttab-prep-n"></span></button>
+      <button type="button" class="tm-tab" id="ttab-links" onclick="showTripTab('links')">Links<span class="tb-n" id="ttab-links-n"></span></button>
+    </div>
+
+    <div class="tm-body">
+
+      <!-- ── SUMMARY: what the trip is, then the plan it turned into ── -->
+      <div class="tm-pane on" id="tpane-summary">
+        <div class="jm-section">
+          <div class="jm-sec-title">🖼️ The card <span class="jm-hint">- the photo and the line you read when you hover it</span></div>
+          <div class="photo-box">
+            <div class="photo-prev" id="p-photoprev" title="Drop an image here, or use Upload">No photo yet</div>
+            <div class="photo-ctl">
+              <textarea id="p-notes" rows="2" placeholder="Short description: what this trip is and why you want it."></textarea>
+              <input id="p-photourl" placeholder="Paste an image link" oninput="photoFromUrl(this.value)">
+              <div class="qa-row">
+                <button type="button" class="btn secondary" onclick="document.getElementById('p-photofile').click()">Upload</button>
+                <button type="button" class="btn secondary" onclick="clearTripPhoto()">Remove</button>
+                <input type="file" id="p-photofile" accept="image/*" style="display:none" onchange="tripPhotoPicked(this.files[0]); this.value=''">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="jm-section plan-wrap">
+          <div class="pk-bar">
+            <div class="jm-sec-title" style="margin:0">🗺️ Plan <span class="jm-hint">- drag an activity onto the day you will do it</span></div>
+            <div class="ti-add">
+              <input type="text" id="p-newidea" placeholder="Add an activity: Sacred Valley tour, the market…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPlanIdea();}">
+              <button type="button" class="jm-addbtn" onclick="addPlanIdea()">+ Add</button>
+            </div>
+          </div>
+          <div id="p-plan" class="plan-wrap" style="min-height:0"></div>
+        </div>
+      </div>
+
+      <!-- ── PREPARATION: who, how, what it costs, and what is left to do ── -->
+      <div class="tm-pane" id="tpane-prep">
+        <div class="tm-col">
+          <div class="jm-section">
+            <div class="jm-sec-title">🧰 Preparation <span class="jm-hint">- who, how you get there, what it costs</span></div>
+            <label>Who is coming</label>
+            <div id="p-people" class="tag-box"></div>
+            <div class="ti-add">
+              <input type="text" id="p-newperson" placeholder="Add a name and press Enter" onkeydown="if(event.key==='Enter'||event.key===','){event.preventDefault();addPerson();}">
+              <button type="button" class="jm-addbtn" onclick="addPerson()">+ Add</button>
+            </div>
+            <div class="jm-grid2 prep-row">
+              <div><label>Transport</label><input id="p-transport" placeholder="Flight, car, train…"></div>
+              <div><label>Where you stay</label><input id="p-stay" placeholder="Airbnb, hotel, camping…"></div>
+            </div>
+            <div class="jm-grid3 prep-row">
+              <div><label>Budget</label><input id="p-budget" oninput="refreshBudgetPreview()" placeholder="2500"></div>
+              <div><label>Spent so far</label><input id="p-spent" oninput="refreshBudgetPreview()" placeholder="900"></div>
+              <div><label>Currency</label><input id="p-currency" oninput="refreshBudgetPreview()" placeholder="CAD"></div>
+            </div>
+            <div id="p-budgetbar" class="budget-preview"></div>
+          </div>
+        </div>
+        <div class="tm-col">
+          <div class="jm-section">
+            <div class="jm-sec-title">✅ Checklist <span class="jm-hint">- what is left before you go</span></div>
+            <div id="p-items"></div>
+            <div class="ti-add">
+              <input type="text" id="p-newitem" placeholder="Book the flight, renew the passport, reserve the car…" onkeydown="if(event.key==='Enter'){event.preventDefault();addTripItem();}">
+              <button type="button" class="jm-addbtn" onclick="addTripItem()">+ Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── LINKS: each one clickable, each one saying what it is ── -->
+      <div class="tm-pane" id="tpane-links">
+        <div class="jm-section" style="display:flex; flex-direction:column; min-height:0; flex:1">
+          <div class="jm-sec-title">🔗 Links <span class="jm-hint">- the page, and what it is for</span></div>
+          <div id="p-linklist" class="lk-list"></div>
+          <button type="button" class="jm-addbtn" style="flex-shrink:0; align-self:flex-start" onclick="addTripLink()">+ Link</button>
+        </div>
+      </div>
+
+    </div><!-- /tm-body -->
+    <div id="planTip" class="pk-tip"></div>
+
+    <div class="tm-foot">
+      <div class="modal-actions">
+        <button class="btn secondary" onclick="closeTripModal()"
+                title="Close and throw away the changes. Clicking outside or pressing Esc saves them.">Discard</button>
+        <button class="btn" onclick="saveTrip()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dropped a trip into Upcoming: Upcoming means dated, so it has to ask when. -->
+<div class="modal-bg" id="dateModalBg">
+  <div class="modal">
+    <h3 id="dt-title">When does it start?</h3>
+    <div class="jm-grid2">
+      <div><label>Start</label><input type="date" id="dt-start" oninput="dtChanged()"></div>
+      <div><label>Days</label><input type="number" id="dt-len" min="1" max="120" placeholder="5" oninput="dtChanged()"></div>
+    </div>
+    <div class="dt-end" id="dt-end"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeTripDate()">Cancel</button>
+      <button class="btn" onclick="saveTripDate()">Move to Upcoming</button>
+    </div>
+  </div>
+</div>
+
+<!-- One activity. Small card over the trip card: the kanban columns are too narrow
+     to edit a description in, and this keeps the board readable. -->
+<div class="modal-bg" id="actModalBg">
+  <div class="modal">
+    <h3 id="act-title">Activity</h3>
+    <label>What you will do</label>
+    <input id="a-what" placeholder="Hike to Avalanche Lake">
+    <div class="act-grid" style="margin-top:10px">
+      <div><label>Where</label><input id="a-place" placeholder="Avalanche Pass"></div>
+      <div><label>How long</label><input id="a-dur" placeholder="2h, half day, 45 min"></div>
+    </div>
+    <label style="margin-top:10px">Description <span class="jm-hint">- what you see when you hover it on the board</span></label>
+    <textarea id="a-desc" rows="4" placeholder="Booking reference, what to bring, why it is worth it…"></textarea>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="deleteActivity()" title="Remove this activity">Delete</button>
+      <button class="btn secondary" onclick="closeActivity()"
+              title="Close and throw away the changes. Clicking outside or pressing Esc keeps them.">Discard</button>
+      <button class="btn" onclick="saveActivity()">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── This app's pages (left menu) ──
+const PAGES = [
+  { id:'board', label:'Plan Trip', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c4.2-4.2 6.3-7.4 6.3-10.2A6.3 6.3 0 0 0 5.7 10.8C5.7 13.6 7.8 16.8 12 21z"/><circle cx="12" cy="10.4" r="2.4"/></svg>' },
+];
+
+// ── Left menu + Hub (SHARED BLOCK - keep it identical in every app) ──
+// The menu lists this app's pages. (The author's private build also has a hub button here,
+// which opens a flyout to their other apps; SHOW_HUB is false in this public build.)
+const SHOW_HUB = false;   // the hub is the author's private build only
+const APP_ID = 'trips';
+const HUB_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>';
+const HUB_APPS = [];      // private build only
+function appUrl(a) {
+  try { const o = JSON.parse(localStorage.getItem('app_links') || '{}'); return o[a.id] || a.url; } catch (e) { return a.url; }
+}
+// The apps live on different origins (files vs the budget server), so localStorage cannot be
+// shared. The theme travels on the jump instead: ?theme= / #theme= is applied and stored on arrival,
+// and every hub link carries the current one out.
+function currentTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+}
+function themeFromUrl() {
+  const m = (location.hash + ' ' + location.search).match(/theme=(dark|light)/);
+  return m ? m[1] : '';
+}
+function withTheme(url) {
+  const t = currentTheme();
+  if (/^https?:/.test(url)) return url + (url.indexOf('?') < 0 ? '?' : '&') + 'theme=' + t;
+  return url + (url.indexOf('#') < 0 ? '#' : '&') + 'theme=' + t;
+}
+let activePage = PAGES[0].id;
+function renderNav() {
+  const nav = document.getElementById('appNav'); if (!nav) return;
+  const hub = SHOW_HUB
+    ? `<button class="side-btn hub-btn" data-tip="My apps" onmouseenter="showHub(this)" onmouseleave="hideHubSoon()" onclick="showHub(this)"><span class="si">${HUB_ICON}</span></button><div class="side-sep"></div>`
+    : '';
+  nav.innerHTML = hub + PAGES.map(p =>
+    `<button class="side-btn${p.id === activePage ? ' active' : ''}" data-tip="${p.label}" onclick="showPage('${p.id}')"><span class="si">${p.icon}</span></button>`).join('');
+}
+function showPage(id) {
+  activePage = id;
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + id));
+  renderNav();
+  if (typeof onPageShown === 'function') onPageShown(id);
+}
+// Hub flyout: a small floating panel with my other apps (kept open while the mouse is on it).
+let hubTimer = null;
+function showHub(el) {
+  if (!SHOW_HUB) return;
+  clearTimeout(hubTimer);
+  const f = document.getElementById('hubFlyout'); if (!f) return;
+  // every app is listed; the one you are in is shown as current and cannot be picked
+  f.innerHTML = HUB_APPS.map(a => a.id === APP_ID
+    ? `<span class="hub-item is-current"><span class="hi">${a.icon}</span>${a.label}</span>`
+    : `<a class="hub-item" href="${withTheme(appUrl(a))}"><span class="hi">${a.icon}</span>${a.label}</a>`).join('');
+  const r = el.getBoundingClientRect();
+  f.hidden = false;
+  f.style.left = (r.right + 10) + 'px';
+  f.style.top = Math.min(r.top, window.innerHeight - f.offsetHeight - 12) + 'px';
+}
+function keepHub() { clearTimeout(hubTimer); }
+function hideHubSoon() {
+  hubTimer = setTimeout(() => { const f = document.getElementById('hubFlyout'); if (f) f.hidden = true; }, 260);
+}
+renderNav();
+
+// ═══════════════════════════════════════════════════════════════
+// TRIP PLANNER - two derived lists: Upcoming (has a start date, soonest
+// first) over Planned trips (still undated, ordered by want score and
+// filterable by kind), each trip card holding its own checklist.
+// Same flat UI language as the Tracker; its own state + own cloud row.
+// ═══════════════════════════════════════════════════════════════
+
+// Trips added from here get a high, unique id so they can never collide with a card
+// created in the app; the seed bump merges them in additively and touches nothing else.
+// Shape: { id, dest, name, status, priority, start, end, travelers, transport, stay, budget,
+//          spent, currency, ideas, links, notes, photo, itinerary, items, flagged, archived }
+const TRIPS = [
+  { id:1, dest:'Lisbon', name:'A week of sun and pastel de nata', status:'Booked', priority:'High',
+    start:'2026-09-12', end:'2026-09-20', travelers:'2 adults', transport:'Flight', stay:'Airbnb, Alfama',
+    budget:'2600', spent:'1450', currency:'EUR',
+    ideas:'Tram 28 early morning, Time Out Market, day trip to Sintra, sunset at Miradouro da Senhora do Monte.',
+    links:'Flight: booking ref ABC123\nApartment: reservation #55210', notes:'Book Sintra tickets before going.',
+    items:[ {text:'Book the flights', done:true}, {text:'Reserve the apartment', done:true},
+            {text:'Travel insurance', done:false}, {text:'Sintra tickets', done:false},
+            {text:'Airport transfer', done:false} ], flagged:false, archived:false },
+  { id:2, dest:'Banff', name:'Road trip through the Rockies', status:'Planning', priority:'Medium',
+    start:'2026-12-27', end:'2027-01-03', travelers:'4 friends', transport:'Rental car', stay:'Cabin + 2 nights hotel',
+    budget:'3200', spent:'400', currency:'CAD',
+    ideas:'Lake Louise at sunrise, hot springs, Johnston Canyon ice walk, one rest day.',
+    links:'Cabin shortlist: 3 options saved', notes:'Winter tires are mandatory on the rental.',
+    items:[ {text:'Pick the cabin', done:true}, {text:'Book the rental car', done:false},
+            {text:'Split the budget with everyone', done:false} ], flagged:true, archived:false },
+  { id:3, dest:'Tokyo', name:'Two weeks, first time in Japan', status:'Idea', priority:'High',
+    start:'', end:'', travelers:'2 adults', transport:'Flight', stay:'Mix of hotel and ryokan',
+    budget:'5000', spent:'', currency:'CAD',
+    ideas:'Shibuya, Kyoto side trip, teamLab, a night in a ryokan with onsen.',
+    links:'', notes:'Cheapest flights look like shoulder season - check May.',
+    items:[ {text:'Compare flight months', done:false}, {text:'Check passport expiry', done:false} ],
+    flagged:false, archived:false },
+  { id:4, dest:'Montreal', name:'Long weekend with family', status:'Done', priority:'Low',
+    start:'2026-05-16', end:'2026-05-19', travelers:'Family of 3', transport:'Train', stay:'With family',
+    budget:'600', spent:'540', currency:'CAD',
+    ideas:'Jean-Talon market, Mont-Royal, brunch on Saint-Denis.', links:'', notes:'Great trip, do it again in the fall.',
+    items:[ {text:'Train tickets', done:true}, {text:'Gift for the hosts', done:true} ], flagged:false, archived:false },
+  { id:5, dest:'Porto', name:'Wine weekend', status:'Idea', priority:'Low',
+    start:'', end:'', travelers:'2 adults', transport:'Flight', stay:'Boutique hotel',
+    budget:'1200', spent:'', currency:'EUR', ideas:'Douro valley tour, port cellars in Gaia.',
+    links:'', notes:'Could bolt on to the Lisbon trip one day.',
+    items:[], flagged:false, archived:false },
+];
+const SEED = 'v7';
+
+const LS_STATE = 'trips_state';
+const LS_BACKUPS = 'trips_backups';
+const LS_THEME = 'app_theme';   // shared across the apps
+
+// Three states, not a pipeline: what you are doing about the trip right now.
+const TRIP_STATUS_ORDER = ['Planning','Ready','Done'];
+const TRIP_DOT = { Planning:'#c79a4a', Ready:'#6fae8c', Done:'#7f8a95' };
+// What kind of trip it is, which changes what you expect to see on the card.
+const TRIP_KINDS = [
+  { id:'Travel',    icon:'✈️' },
+  { id:'Road trip', icon:'🚗' },
+  { id:'Event',     icon:'🎟️' },
+];
+function kindIcon(k) { const f = TRIP_KINDS.find(x => x.id === k); return f ? f.icon : '✈️'; }
+// Old stages and High/Medium/Low, kept only to migrate boards saved before this redesign.
+const LEGACY_STATUS = { Idea:'Planning', Planning:'Planning', Booked:'Ready', Ready:'Ready', Ongoing:'Ready', Done:'Done' };
+// Importance is 1 to 5, picked on a toggle. It used to be 1 to 10; `healWantScale`
+// halves a board saved on the old scale, once, so a 9 does not read as "barely want it".
+const WANT_MAX = 5;
+const LEGACY_WANT = { High:4, Medium:3, Low:2 };
+
+let trips = [], nextTripId = 1, editingTrip = null;
+let modalItems = [];        // working to-do list for the open trip modal
+let modalPeople = [];       // working "who is coming" tags
+let tripSort = 'want';      // orders Planned trips; Upcoming is always soonest first
+let tripKindFilter = 'all'; // Planned trips filter: all | Travel | Road trip | Event
+let showTripArchive = false;
+let showDoneTrips = false;
+
+// ── Helpers ──
+function escHtml(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+function escAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
+function todayISO() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+}
+function toast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── Persistence ──
+// An old `when` string -> a day number, when we can tell: "Day 3", or a real date
+// inside the trip. Anything else returns null and the text is kept as-is.
+function legacyPlanDay(when, start, end) {
+  const w = String(when || '').trim();
+  if (!w) return null;
+  const m = w.match(/^(?:day|jour)\s*(\d{1,3})$/i);
+  const days = tripDayList(start, end);
+  if (m) { const n = Number(m[1]); return (days.length && n >= 1 && n <= days.length) ? n : null; }
+  if (!days.length) return null;
+  const iso = parseDateToken(w, Number(String(start).slice(0, 4)) || undefined);
+  const hit = iso ? days.find(d => d.iso === iso) : null;
+  return hit ? hit.n : null;
+}
+function normalizeTrips() {
+  // Default every field so a trip saved before a field existed still renders.
+  trips.forEach(t => {
+    ['dest','name','start','end','transport','stay','budget','spent','ideas','links','notes','photo']
+      .forEach(k => { if (t[k] === undefined) t[k] = ''; });
+    // Six stages collapsed to three; High/Medium/Low became a want score.
+    if (!TRIP_STATUS_ORDER.includes(t.status)) t.status = LEGACY_STATUS[t.status] || 'Planning';
+    if (!TRIP_KINDS.some(k => k.id === t.kind)) t.kind = 'Travel';
+    let w = Number(t.want);
+    if (!isFinite(w) || w < 1) w = LEGACY_WANT[t.priority] || 3;
+    t.want = Math.min(WANT_MAX, Math.max(1, Math.round(w)));
+    delete t.priority;
+    // Duration: a first-class field, because a trip can have a length before it has dates.
+    if (t.start && t.end) t.lenDays = daysBetween(t.start, t.end) || '';
+    else { const n = Number(t.lenDays) || 0; t.lenDays = n > 0 && n <= MAX_TRIP_DAYS ? n : ''; }
+    // "the user + Sam" becomes two tags you can see and remove one by one.
+    if (!Array.isArray(t.people)) {
+      t.people = String(t.travelers || '').split(/\s*(?:,|\+|&|\band\b|\bet\b)\s*/i).map(s => s.trim()).filter(Boolean);
+    }
+    t.people = t.people.map(s => String(s).trim()).filter(Boolean);
+    delete t.travelers;
+    if (t.currency === undefined) t.currency = 'CAD';
+    t.items = (Array.isArray(t.items) ? t.items : []).map(i => ({ text: String(i && i.text || ''), done: !!(i && i.done) }));
+    // The plan: one list, each entry either waiting (day null) or dropped on a day (1..N).
+    // Older boards stored {when, what} free text plus a separate "places & ideas" blob;
+    // both fold in here, and `legacyPlanDay` recovers the day number where it can.
+    t.itinerary = (Array.isArray(t.itinerary) ? t.itinerary : [])
+      .map(x => {
+        // place / dur / desc arrived with the kanban; an older activity simply has none.
+        const extra = { place: String(x && x.place || ''), dur: String(x && x.dur || ''), desc: String(x && x.desc || '') };
+        if (x && x.day !== undefined && x.when === undefined) {          // already migrated
+          return { what: String(x.what || ''), day: x.day == null ? null : Number(x.day), ...extra };
+        }
+        const when = String(x && x.when || '').trim(), what = String(x && x.what || '').trim();
+        const day = legacyPlanDay(when, t.start, t.end);
+        // Nothing is thrown away: a `when` we cannot read stays in front of the text.
+        return { what: (day === null && when) ? (when + ' - ' + what).replace(/ - $/, '') : what, day, ...extra };
+      })
+      .filter(x => x.what);
+    // "Places, ideas & must-do" was a textarea; each line becomes an idea waiting for a day.
+    if (String(t.ideas || '').trim()) {
+      String(t.ideas).split(/\r?\n/).map(l => l.replace(/^\s*[-*•]\s*/, '').trim()).filter(Boolean)
+        .forEach(l => t.itinerary.push({ what: l, day: null, place: '', dur: '', desc: '' }));
+      t.ideas = '';
+    }
+    // Links became a list of {url, note}; the old newline textarea is parsed once.
+    if (!Array.isArray(t.linkList)) t.linkList = parseLinkLines(t.links);
+    t.linkList = t.linkList.map(l => ({ url: String(l && l.url || ''), note: String(l && l.note || '') }))
+                           .filter(l => l.url || l.note);
+    if (t.flagged === undefined) t.flagged = false;
+    if (t.archived === undefined) t.archived = false;
+  });
+  nextTripId = Math.max(nextTripId, ...trips.map(t => (t.id || 0) + 1), 1);
+}
+function loadState() {
+  let s = null;
+  const raw = localStorage.getItem(LS_STATE);
+  if (raw) { try { s = JSON.parse(raw); } catch(e) {} }
+  if (!s) {
+    trips = TRIPS.map(t => ({ ...t }));
+    nextTripId = trips.length + 1;
+    // A fresh board comes straight off the seed, which is already on the 1-5 scale. Mark
+    // the scale migration done, or it would halve every seed value on first run.
+    try { localStorage.setItem(LS_WANT_HEAL, WANT_HEAL); } catch (e) {}
+  } else {
+    trips = s.trips || [];
+    nextTripId = s.nextTripId || trips.length + 1;
+    // On a SEED bump, additively merge new seed trips by id and keep everything already there.
+    if (s.seed !== SEED) {
+      const have = new Set(trips.map(t => t.id));
+      TRIPS.forEach(t => { if (!have.has(t.id)) trips.push({ ...t }); });
+    }
+  }
+  healSeedPhotos();
+  healWantScale();    // before normalizeTrips, which would clamp a 9 down to 5
+  normalizeTrips();
+  healTrip501();      // after normalizeTrips: it works on the migrated {what, day} plan
+  healTripLinks();    // and on the migrated linkList
+  saveState();
+  autoBackup();
+}
+// The seed only reaches a board through the by-id merge, so a trip already on the board
+// can never pick up a photo added to the seed later. This runs on EVERY load rather than
+// once: a seeded photo went missing twice, and a one-shot flag cannot put it back after
+// a sync or a full-storage save drops it. Removing a photo ON PURPOSE sets `photoCleared`,
+// which is what stops this from fighting you.
+function healSeedPhotos() {
+  TRIPS.forEach(seed => {
+    if (!seed.photo) return;
+    const t = trips.find(x => x.id === seed.id);
+    if (t && !t.photo && !t.photoCleared) t.photo = seed.photo;
+  });
+}
+// Importance went from 1-10 to a 1-5 toggle. Halving is the only honest conversion, and it
+// has to happen ONCE: run twice and a 5 would become a 3, then a 2.
+const LS_WANT_HEAL = 'trips_want_scale';
+const WANT_HEAL = 'v5';
+function healWantScale() {
+  if (localStorage.getItem(LS_WANT_HEAL) === WANT_HEAL) return;
+  trips.forEach(t => {
+    const w = Number(t.want);
+    if (isFinite(w) && w > 0) t.want = Math.min(WANT_MAX, Math.max(1, Math.ceil(w / 2)));
+  });
+  try { localStorage.setItem(LS_WANT_HEAL, WANT_HEAL); } catch (e) {}
+}
+// Same gap, this time for CONTENT: a card already on the board can never pick up
+// research added to the seed later. Empty in the public build.
+const LS_TRIP_HEAL = 'trips_content_heal';
+const TRIP_HEAL = 'content-v1';
+function sameText(a, b) { return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase(); }
+function healTrip501() { /* demo build: no researched content to heal */ }
+// Links became rows with their own description when the card was split into tabs. This
+// gives seeded links theirs. Its own flag, so it never re-runs the content
+// heal above: a note the user wrote is left alone, and a link he deleted stays deleted.
+const LS_LINK_HEAL = 'trips_link_heal';
+const LINK_HEAL = 'links-v1';
+function healTripLinks() { /* demo build: no researched content to heal */ }
+// ── Writing to a localStorage this app does not own alone ──
+// Every vault app is a file:// page, so they all share ONE ~5 MB origin: jobs_state,
+// tasks_state, trips_state, therapy_vault and every app's *_backups. Backup histories
+// once ate 89% of that and the job board silently booted empty. So: a write must never
+// throw, and when room is needed the only thing sacrificed is BACKUP history, never a
+// *_state key and never the therapy vault.
+function writeLS(key, value) {
+  try { localStorage.setItem(key, value); return true; } catch (e) {}
+  const shed = [LS_BACKUPS, 'jobs_backups', 'tasks_backups', 'tracker_backups'];
+  for (const k of shed) {
+    try {
+      const arr = JSON.parse(localStorage.getItem(k) || '[]');
+      if (!Array.isArray(arr) || !arr.length) continue;
+      // Halve the history rather than dropping it: a shorter undo beats no board.
+      localStorage.setItem(k, JSON.stringify(arr.slice(Math.ceil(arr.length / 2))));
+      localStorage.setItem(key, value);
+      return true;
+    } catch (e) {}
+  }
+  try { localStorage.removeItem(LS_BACKUPS); localStorage.setItem(key, value); return true; } catch (e) {}
+  toast('This device is out of local storage. The board is fine and still syncing to the cloud.');
+  return false;
+}
+function saveState() {
+  writeLS(LS_STATE, JSON.stringify({ seed: SEED, trips, nextTripId }));
+  schedulePush();
+}
+
+// ── Backup / Restore ──
+// Manual backup: download the whole board as a dated JSON file (lands in Downloads,
+// which is the file Claude reads to mirror the board into the vault).
+function exportBackup() {
+  const payload = { seed: SEED, trips, nextTripId, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'trips-backup-' + todayISO() + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  setSync('Backed up');
+}
+function restoreBackup(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let d;
+    try { d = JSON.parse(reader.result); } catch (e) { alert('That file is not valid JSON.'); return; }
+    if (!d || !Array.isArray(d.trips)) { alert('That backup has no trips in it.'); return; }
+    if (!confirm('Restore ' + d.trips.length + ' trips from this backup?\nThis replaces your current board (a snapshot of the current one is kept).')) return;
+    autoBackup(); // snapshot the current board before overwriting
+    // A ring backup carries no photos, so keep the ones already on the board rather than
+    // restoring a board full of blanks. `healSeedPhotos` fills any others back in.
+    const keep = {};
+    trips.forEach(t => { if (t.photo) keep[t.id] = t.photo; });
+    const restored = d.trips.map(t => (!t.photo && keep[t.id]) ? { ...t, photo: keep[t.id] } : t);
+    writeLS(LS_STATE, JSON.stringify({ seed: d.seed || SEED, trips: restored, nextTripId: d.nextTripId }));
+    loadState();
+    renderAll();
+    if (currentUser) pushToCloudNow();
+    setSync('Restored');
+  };
+  reader.readAsText(file);
+}
+// In-browser safety net: a rolling ring of the last 15 snapshots in localStorage.
+// Recoverable from the console (trips_backups) if the live board ever gets clobbered.
+// A rollback copy does NOT need the photos. They are the only fat thing on a trip (tens of
+// KB of base64 each), 15 copies of them is what fills a shared 5 MB quota, and a photo is
+// recoverable from the seed or the cloud row anyway. Everything else is kept in full.
+function backupTrips() {
+  return trips.map(t => { const c = { ...t }; if (c.photo) c.photo = ''; return c; });
+}
+function autoBackup() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(LS_BACKUPS) || '[]');
+    arr.push({ ts: new Date().toISOString(), seed: SEED, trips: backupTrips(), nextTripId, noPhotos: true });
+    // Ten, not fifteen: a researched card is a lot of text, and this ring shares its 5 MB
+    // with every other app in the vault. Ten rollbacks is still a real safety net.
+    while (arr.length > 10) arr.shift();
+    writeLS(LS_BACKUPS, JSON.stringify(arr));
+  } catch (e) {}
+}
+
+// ── Shared option-picker popover ──
+let menuEl = null, menuPick = null, menuOpts = null;
+function closeMenu() {
+  if (menuEl) { menuEl.remove(); menuEl = null; menuPick = null; menuOpts = null; }
+  document.removeEventListener('click', closeMenu);
+}
+function openMenu(ev, opts, onPick) {
+  ev.stopPropagation();
+  closeMenu();
+  menuOpts = opts; menuPick = onPick;
+  const menu = document.createElement('div');
+  menu.className = 'state-menu';
+  menu.innerHTML = opts.map((o, i) =>
+    `<button class="${o.cur ? 'cur' : ''}" onclick="pickMenu(${i})"><span class="dot" style="background:${o.color || 'transparent'}"></span>${o.label}</button>`).join('');
+  document.body.appendChild(menu);
+  const r = ev.target.getBoundingClientRect();
+  menu.style.top = (window.scrollY + r.bottom + 4) + 'px';
+  let left = window.scrollX + r.right - menu.offsetWidth;
+  if (left < 8) left = 8;
+  menu.style.left = left + 'px';
+  menuEl = menu;
+  setTimeout(() => document.addEventListener('click', closeMenu), 0);
+}
+function pickMenu(i) {
+  const opts = menuOpts, fn = menuPick;
+  closeMenu();
+  if (fn && opts && opts[i]) fn(opts[i].val);
+}
+
+// ── Trip helpers ──
+function tripItems(t) { return Array.isArray(t.items) ? t.items : []; }
+function tripProgress(t) { const it = tripItems(t); return { done: it.filter(i => i.done).length, total: it.length }; }
+function money(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : null; }
+function fmtMoney(n) { return Math.round(n).toLocaleString('en-CA'); }
+// Whole days the trip lasts (inclusive). A trip with only a duration knows its length
+// too, which is the point of storing `lenDays`: "5 days, dates to be decided".
+function tripDays(t) {
+  if (t.start && t.end) {
+    const a = new Date(t.start + 'T00:00:00'), b = new Date(t.end + 'T00:00:00');
+    const d = Math.round((b - a) / 86400000) + 1;
+    if (d > 0) return d;
+  }
+  const n = Number(t.lenDays) || 0;
+  return n > 0 ? n : null;
+}
+// "in 24d" before departure, "ongoing" while away, "12d ago" once back.
+function tripCountdown(t) {
+  if (!t.start) return null;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const s = new Date(t.start + 'T00:00:00');
+  const e = t.end ? new Date(t.end + 'T00:00:00') : s;
+  const d = Math.round((s - now) / 86400000);
+  if (d > 0) return { cls: d <= 30 ? 'soon' : '', label: 'in ' + d + 'd' };
+  if (now <= e) return { cls: 'now', label: 'ongoing' };
+  return { cls: '', label: Math.round((now - e) / 86400000) + 'd ago' };
+}
+// Short date, keeping the year when the trip is not in the current one.
+function fmtTripDate(d) {
+  const dt = new Date(d + 'T00:00:00');
+  const opts = { month: 'short', day: 'numeric' };
+  if (dt.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return dt.toLocaleDateString('en-US', opts);
+}
+function tripDatePill(t) {
+  if (!t.start && !t.end) return '';
+  const days = tripDays(t);
+  const range = t.start ? fmtTripDate(t.start) + (t.end ? ' → ' + fmtTripDate(t.end) : '') : fmtTripDate(t.end);
+  return `<span class="date-pill" title="Trip dates">📅 ${range}${days ? ' · ' + days + 'd' : ''}</span>`;
+}
+// Who is coming, then how you get there and where you sleep - as separate labelled groups.
+function tripChips(t) {
+  const chips = [];
+  (t.people || []).slice(0, 4).forEach(p => chips.push([p, 'people']));
+  if ((t.people || []).length > 4) chips.push(['+' + (t.people.length - 4), 'people']);
+  if (t.transport) chips.push(['via ' + t.transport, 'mode']);
+  if (t.stay) chips.push(['stay ' + t.stay, 'loc']);
+  if (!chips.length) return '';
+  return `<div class="tc-chips">${chips.slice(0, 7).map(([txt, c]) => `<span class="jc-chip ${c}">${escHtml(txt)}</span>`).join('')}</div>`;
+}
+// Money reads faster as a bar than as a number: how much of the budget is already gone.
+function budgetBarHTML(t) {
+  const cur = (t.currency || 'CAD').trim();
+  const b = money(t.budget), s = money(t.spent);
+  if (b === null && s === null) return '';
+  if (b === null) return `<div class="tt-money"><span class="tt-spent">💸 ${fmtMoney(s)} ${cur} spent</span></div>`;
+  const pct = s === null ? 0 : Math.max(0, Math.min(100, Math.round(s / (b || 1) * 100)));
+  const over = s !== null && s > b;
+  const left = s === null ? b : b - s;
+  return `<div class="tt-money">
+    <div class="tt-money-top">
+      <span class="tt-budget">💰 ${fmtMoney(b)} ${cur}</span>
+      ${s !== null ? `<span class="${over ? 'tt-over' : 'tt-left'}">${fmtMoney(Math.abs(left))} ${over ? 'over' : 'left'}</span>` : ''}
+    </div>
+    ${s !== null ? `<div class="tt-money-bar"><div class="tt-money-fill${over ? ' over' : ''}" style="width:${over ? 100 : pct}%"></div></div>` : ''}
+  </div>`;
+}
+// The checklist read as readiness, which is what you actually want to know before leaving.
+function tripProgHTML(t) {
+  const p = tripProgress(t);
+  if (!p.total) return '';
+  const pct = Math.round(p.done / p.total * 100);
+  return `<div class="tc-prog" title="${p.done} of ${p.total} done">
+    <div class="tc-prog-lbl"><span>${pct === 100 ? 'Ready to go' : 'Ready'}</span><span>${p.done}/${p.total}</span></div>
+    <div class="tc-prog-bar"><div class="tc-prog-fill" style="width:${pct}%"></div></div>
+  </div>`;
+}
+
+// ── Sorting ──
+function cmpTripDate(a, b) {
+  const as = a.start || '', bs = b.start || '';
+  if (as && bs) return as.localeCompare(bs);
+  if (as) return -1;              // dated trips first
+  if (bs) return 1;
+  return (b.want || 0) - (a.want || 0);
+}
+function cmpWant(a, b) {
+  if ((b.want || 0) !== (a.want || 0)) return (b.want || 0) - (a.want || 0);
+  return cmpTripDate(a, b);
+}
+function sortedTrips() {
+  return trips.slice().sort((a, b) => {
+    if (tripSort === 'name') return (a.dest || '').localeCompare(b.dest || '');
+    if (tripSort === 'newest') return (b.id || 0) - (a.id || 0);
+    if (tripSort === 'want') return cmpWant(a, b);
+    return cmpTripDate(a, b);     // default: soonest departure first
+  });
+}
+function setTripSort(v) { tripSort = v; buildTripList(); }
+// Clicking the kind you are already on clears the filter, so it never traps you.
+function setTripKind(v) { tripKindFilter = (tripKindFilter === v && v !== 'all') ? 'all' : v; buildTripList(); }
+
+// ── Option pickers ──
+function openTripStatusMenu(id, ev) {
+  ev.stopPropagation();
+  const t = trips.find(x => x.id === id); if (!t) return;
+  openMenu(ev, TRIP_STATUS_ORDER.map(s => ({ val: s, label: s, color: TRIP_DOT[s], cur: s === t.status })),
+    v => { t.status = v; saveState(); buildTripList(); });
+}
+function openTripKindMenu(ev, id) {
+  ev.stopPropagation();
+  const t = trips.find(x => x.id === id); if (!t) return;
+  openMenu(ev, TRIP_KINDS.map(k => ({ val: k.id, label: k.icon + '  ' + k.id, cur: k.id === t.kind })),
+    v => { t.kind = v; saveState(); buildTripList(); });
+}
+// 1 to 10, 10 being the one you most want to do.
+function openTripWantMenu(ev, id) {
+  ev.stopPropagation();
+  const t = trips.find(x => x.id === id); if (!t) return;
+  const opts = [];
+  for (let n = 10; n >= 1; n--) opts.push({ val: n, label: String(n) + (n === 10 ? '  most want to go' : n === 1 ? '  someday maybe' : ''), cur: n === t.want });
+  openMenu(ev, opts, v => { t.want = Number(v); saveState(); buildTripList(); });
+}
+
+// ── Cards ──
+function tripActionsHTML(t) {
+  return `<div class="tc-actions">
+    <button class="icon-btn flag-btn${t.flagged ? ' on' : ''}" onclick="toggleTripFlag(event,${t.id})" title="Flag - pin to top">${t.flagged ? '🚩' : '⚑'}</button>
+    <button class="icon-btn" onclick="archiveTrip(event,${t.id})" title="Archive - not happening">📁</button>
+    <button class="icon-btn" onclick="event.stopPropagation();deleteTrip(${t.id})" title="Delete">🗑️</button>
+  </div>`;
+}
+// Up to two letters standing in for a missing photo.
+function tripInitials(t) {
+  const words = String(t.dest || '?').trim().split(/[\s,]+/).filter(Boolean);
+  return ((words[0] || '?')[0] + (words[1] ? words[1][0] : '')).toUpperCase();
+}
+function tripItin(t) { return Array.isArray(t.itinerary) ? t.itinerary : []; }
+// The first few stops, for the hover panel. Days first, in order, then whatever is
+// still waiting for a day - that is the order you would read the plan in.
+function itinPreviewHTML(t, n) {
+  const it = tripItin(t).slice().sort((a, b) => {
+    const ad = a.day == null ? 1e6 : a.day, bd = b.day == null ? 1e6 : b.day;
+    return ad - bd;
+  });
+  if (!it.length) return '';
+  const shown = it.slice(0, n);
+  return `<div class="tt-itin">
+    ${shown.map(x => `<div class="ti-line">${x.day != null ? `<span class="ti-when">Day ${x.day}</span>` : ''}<span>${escHtml(x.what)}</span></div>`).join('')}
+    ${it.length > n ? `<div class="ti-more">+${it.length - n} more stop${it.length - n > 1 ? 's' : ''}</div>` : ''}
+  </div>`;
+}
+// Dates line. Nothing at all when there is no date yet, rather than a placeholder.
+// "Jul 3 → Jul 12, 2027" rather than repeating the year on both ends, so the line
+// stays on one row inside a narrow tile.
+function fmtRange(t) {
+  if (!t.start && !t.end) return '';
+  if (!t.start) return fmtTripDate(t.end);
+  if (!t.end) return fmtTripDate(t.start);
+  const ys = t.start.slice(0, 4), ye = t.end.slice(0, 4);
+  if (ys !== ye) return fmtTripDate(t.start) + ' → ' + fmtTripDate(t.end);
+  const short = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const year = ys === String(new Date().getFullYear()) ? '' : ', ' + ys;
+  return short(t.start) + ' → ' + short(t.end) + year;
+}
+// Dates only. The length of the trip has its own badge in the bottom-right corner.
+function tileDatesHTML(t) {
+  if (!t.start && !t.end) return '';
+  return `<div class="tt-dates">📅 ${fmtRange(t)}</div>`;
+}
+// How many days the trip lasts, bottom-right of the card. Nothing when the dates
+// cannot say (no end date yet), rather than a made-up number.
+function tileDaysHTML(t) {
+  const d = tripDays(t);
+  if (!d) return '';
+  return `<div class="tt-days" title="How long the trip lasts">${d} day${d === 1 ? '' : 's'}</div>`;
+}
+// The short description, shown on hover. Falls back to the places/ideas note so an older
+// trip that never had a description still says something useful.
+function tripDescText(t) {
+  return String(t.notes || t.ideas || '').replace(/\s+/g, ' ').trim();
+}
+function tripDescHTML(t) {
+  const d = tripDescText(t);
+  return d ? `<div class="tt-desc">${escHtml(d)}</div>` : '';
+}
+// Countdown belongs under the status, and only when it means something:
+// a finished trip or an undated idea gets nothing.
+function tileCountHTML(t) {
+  if (t.status === 'Done' || !t.start) return '';
+  const cd = tripCountdown(t);
+  if (!cd || /ago$/.test(cd.label)) return '';
+  const nice = cd.label === 'ongoing' ? 'happening now' : 'in ' + cd.label.replace(/^in /, '').replace('d', ' days');
+  return `<span class="tt-count ${cd.cls}">${nice}</span>`;
+}
+// One square photo tile. The photo carries the trip; hovering reveals the detail.
+function tripTileHTML(t) {
+  const img = t.photo
+    ? `<div class="tt-img" style="background-image:url('${escAttr(t.photo)}')"></div>`
+    : `<div class="tt-img tt-none"><span class="tt-initials">${escHtml(tripInitials(t))}</span></div>`;
+  return `<div class="trip-tile${t.flagged ? ' flagged' : ''}" draggable="true"
+       ondragstart="tripDragStart(event,${t.id})" ondragend="tripDragEnd()"
+       onclick="tripCardClick(event,${t.id})"
+       ondragover="photoDragOver(event)" ondragleave="photoDragLeave(event)" ondrop="photoDrop(event,${t.id})"
+       title="${escAttr((t.dest || '') + (t.name ? ' · ' + t.name : ''))}">
+    ${img}
+    <div class="tt-scrim"></div>
+    <div class="tt-top">
+      <span class="tt-kind" onclick="openTripKindMenu(event,${t.id})" title="Change the kind of trip">${kindIcon(t.kind)} ${escHtml(t.kind)}</span>
+      <div class="tt-right">
+        <span class="tt-status" style="color:${TRIP_DOT[t.status] || '#cfd4da'}" onclick="openTripStatusMenu(${t.id},event)" title="Change status">${escHtml(t.status)}</span>
+        ${tileCountHTML(t)}
+      </div>
+    </div>
+    <div class="tt-base${tripDays(t) ? ' has-days' : ''}">
+      <div class="tt-dest">${escHtml(t.dest || '(no destination)')}</div>
+      ${t.name ? `<div class="tt-name">${escHtml(t.name)}</div>` : ''}
+      ${tileDatesHTML(t)}
+      ${budgetBarHTML(t)}
+    </div>
+    <div class="tt-hover">
+      <div class="tt-h-head">
+        <div>
+          <div class="tt-h-dest">${escHtml(t.dest || '(no destination)')}</div>
+          ${t.name ? `<div class="tt-h-sub">${escHtml(t.name)}</div>` : ''}
+        </div>
+        <span class="want-dot" onclick="openTripWantMenu(event,${t.id})" title="How much you want to do this, 1 to 10">${t.want}</span>
+      </div>
+      ${tripDescHTML(t)}
+      ${tripChips(t)}
+      ${itinPreviewHTML(t, 2)}
+      ${tripProgHTML(t)}
+      ${tripActionsHTML(t)}
+    </div>
+    ${tileDaysHTML(t)}
+  </div>`;
+}
+function tripCardHTML(t) { return tripTileHTML(t); }
+function tripBacklogCardHTML(t) { return tripTileHTML(t); }
+function archivedTripRowHTML(t) {
+  return `<div class="saved-row" onclick="tripCardClick(event,${t.id})">
+    <div class="sv-main">
+      <div class="sv-line1"><span class="sv-co">${escHtml(t.dest || '(no destination)')}</span>${t.name ? `<span class="sv-role">${escHtml(t.name)}</span>` : ''}</div>
+      ${tripDatePill(t)}
+    </div>
+    <span class="sv-actions">
+      <button class="icon-btn" onclick="unarchiveTrip(event,${t.id})" title="Restore">↩︎</button>
+      <button class="icon-btn" onclick="event.stopPropagation();deleteTrip(${t.id})" title="Delete">🗑️</button>
+    </span>
+  </div>`;
+}
+function toggleTripArchive() { showTripArchive = !showTripArchive; buildTripList(); }
+
+function buildTripList() {
+  const host = document.getElementById('tripList');
+  if (!host) return;
+  const put = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  const q = tripSearch.trim().toLowerCase();
+  const ordered = sortedTrips().filter(t => tripMatchesSearch(t, q));
+  const live = ordered.filter(t => !t.archived);
+  const archived = ordered.filter(t => t.archived);
+  const note = document.getElementById('searchNote');
+  if (note) {
+    const n = live.length + archived.length;
+    note.textContent = q ? `${n} trip${n === 1 ? '' : 's'} match “${tripSearch.trim()}”.` : '';
+    note.hidden = !q;
+  }
+  // Two lists, not a pipeline. Anything with a departure date is upcoming and sorted by
+  // how soon it is; anything still undated is planned, sorted by how much you want it.
+  const upcoming = live.filter(t => t.status !== 'Done' && t.start).sort(cmpTripDate);
+  const backlog  = live.filter(t => t.status !== 'Done' && !t.start).sort(cmpWant);
+  const done     = live.filter(t => t.status === 'Done').sort((a, b) => (b.start || '').localeCompare(a.start || ''));
+  const pin = list => list.slice().sort((a, b) => (b.flagged ? 1 : 0) - (a.flagged ? 1 : 0));
+  // The sort control is static markup, so it is told the current value rather than re-rendered.
+  const sortSel = document.getElementById('tripSortSel');
+  if (sortSel && sortSel.value !== tripSort) sortSel.value = tripSort;
+
+  put('upCount', String(upcoming.length));
+  put('upcomingList', upcoming.length
+    ? pin(upcoming).map(tripCardHTML).join('')
+    : `<div class="kcol-empty">${q ? 'Nothing upcoming matches this search.' : 'Nothing booked in. Give a trip a start date and it moves up here.'}</div>`);
+
+  // Planned trips can be filtered by what kind of trip they are. The counts come from the
+  // unfiltered list, so a filter that would show nothing still tells you it is empty.
+  const kindCount = k => backlog.filter(t => t.kind === k).length;
+  const kindChip = (v, label, n) =>
+    `<button type="button" class="kind-chip${tripKindFilter === v ? ' on' : ''}" onclick="setTripKind('${v}')">${label}<span class="kf-n">${n}</span></button>`;
+  put('kindFilter', backlog.length
+    ? kindChip('all', 'All', backlog.length) + TRIP_KINDS.map(k => kindChip(k.id, k.icon + ' ' + k.id, kindCount(k.id))).join('')
+    : '');
+  const shown = tripKindFilter === 'all' ? backlog : backlog.filter(t => t.kind === tripKindFilter);
+  const emptyPlanned = q ? 'No planned trip matches this search.'
+    : tripKindFilter !== 'all' ? 'No ' + tripKindFilter.toLowerCase() + ' planned yet.'
+    : 'Nothing planned yet. Use + Trip, or paste trip details anywhere on the page.';
+
+  put('planCount', String(shown.length));
+  put('plannedList', (shown.length
+    ? pin(shown).map(tripBacklogCardHTML).join('')
+    : `<div class="kcol-empty">${emptyPlanned}</div>`)
+    + (trips.length ? '' : '<div class="trip-hint">Use <b>+ Trip</b>, or paste trip details anywhere on this page. Trips without a date wait here; add a date and the card moves up to Upcoming.</div>'));
+
+  const doneHTML = done.length ? `<div class="saved-section">
+    <div class="saved-head archive-head" onclick="toggleDoneTrips()">
+      <span class="arch-arrow">${showDoneTrips ? '▼' : '▶'}</span> ✅ Done <span class="kcnt">${done.length}</span>
+      <span class="arch-hint">trips you have taken</span>
+    </div>
+    ${showDoneTrips ? `<div class="saved-list tile-grid">${done.map(tripCardHTML).join('')}</div>` : ''}
+  </div>` : '';
+
+  const archiveHTML = archived.length ? `<div class="saved-section archive-section">
+    <div class="saved-head archive-head" onclick="toggleTripArchive()">
+      <span class="arch-arrow">${showTripArchive ? '▼' : '▶'}</span> 🗄️ Archived <span class="kcnt">${archived.length}</span>
+      <span class="arch-hint">trips you decided not to take</span>
+    </div>
+    ${showTripArchive ? `<div class="saved-list archive-list">${archived.map(archivedTripRowHTML).join('')}</div>` : ''}
+  </div>` : '';
+
+  // Only the two collapsible drawers are fully re-rendered - nothing in them holds a caret.
+  host.innerHTML = `${doneHTML}${archiveHTML}`;
+}
+function toggleDoneTrips() { showDoneTrips = !showDoneTrips; buildTripList(); }
+
+// ── Search ──
+// Matches everything you can put on a trip, including the itinerary and the checklist.
+let tripSearch = '';
+function tripMatchesSearch(t, q) {
+  if (!q) return true;
+  const hay = [t.dest, t.name, t.status, t.kind, (t.people || []).join(' '), t.transport, t.stay,
+               t.notes, t.ideas, t.links, t.currency, t.start, t.end,
+               tripLinks(t).map(l => l.url + ' ' + l.note).join(' '),
+               tripItin(t).map(x => (x.day != null ? 'day ' + x.day + ' ' : '')
+                                    + [x.what, x.place, x.dur, x.desc].filter(Boolean).join(' ')).join(' '),
+               tripItems(t).map(i => i.text).join(' ')].join(' ').toLowerCase();
+  // Every word must appear somewhere, so "peru august" narrows instead of widening.
+  return q.split(/\s+/).filter(Boolean).every(w => hay.includes(w));
+}
+function setTripSearch(v) {
+  tripSearch = v || '';
+  const box = document.getElementById('tripSearchBox');
+  if (box) box.classList.toggle('on', !!tripSearch.trim());
+  buildTripList();
+}
+function clearTripSearch() {
+  const inp = document.getElementById('tripSearch');
+  if (inp) inp.value = '';
+  setTripSearch('');
+  if (inp) inp.focus();
+}
+
+// ── Card interactions ──
+function tripCardClick(e, id) {
+  if (e.target.closest('button, a, .tt-status, .tt-kind, .want-dot')) return;
+  openTripModal(id);
+}
+function toggleTripFlag(e, id) { e.stopPropagation(); const t = trips.find(x => x.id === id); if (!t) return; t.flagged = !t.flagged; saveState(); buildTripList(); }
+function archiveTrip(e, id) { e.stopPropagation(); const t = trips.find(x => x.id === id); if (!t) return; t.archived = true; saveState(); buildTripList(); }
+function unarchiveTrip(e, id) { e.stopPropagation(); const t = trips.find(x => x.id === id); if (!t) return; t.archived = false; saveState(); buildTripList(); }
+function deleteTrip(id) {
+  const t = trips.find(x => x.id === id);
+  if (!confirm('Remove ' + ((t && t.dest) || 'this trip') + '?')) return;
+  trips = trips.filter(x => x.id !== id);
+  saveState(); buildTripList();
+}
+
+// ── Photos ──
+// Stored inline on the trip as a data URL (or a plain link if you paste one), so a photo
+// syncs with the board instead of pointing at a file that only exists on one machine.
+// Uploads are drawn through a canvas first: full-size phone photos would blow the state up.
+const PHOTO_MAX = 900;          // longest edge, px
+const PHOTO_QUALITY = 0.72;     // JPEG quality
+function downscaleImage(file, cb) {
+  if (!file || !/^image\//.test(file.type || '')) { cb(null, 'That file is not an image.'); return; }
+  const fr = new FileReader();
+  fr.onerror = () => cb(null, 'Could not read that file.');
+  fr.onload = () => {
+    const img = new Image();
+    img.onerror = () => cb(null, 'That image could not be decoded.');
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, PHOTO_MAX / Math.max(img.width || 1, img.height || 1));
+        const w = Math.max(1, Math.round((img.width || 1) * scale));
+        const h = Math.max(1, Math.round((img.height || 1) * scale));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        cb(c.toDataURL('image/jpeg', PHOTO_QUALITY), null);
+      } catch (e) { cb(null, 'That image could not be processed.'); }
+    };
+    img.src = fr.result;
+  };
+  fr.readAsDataURL(file);
+}
+let modalPhoto = '';            // the photo being edited in the open modal
+let modalPhotoCleared = false;  // true only when you pressed Remove, so the heal leaves it alone
+function renderPhotoPreview() {
+  const el = document.getElementById('p-photoprev'); if (!el) return;
+  el.style.backgroundImage = modalPhoto ? `url('${modalPhoto.replace(/'/g, "\\'")}')` : '';
+  el.textContent = modalPhoto ? '' : 'No photo yet';
+}
+function tripPhotoPicked(file) {
+  downscaleImage(file, (data, err) => {
+    if (!data) { toast(err || 'Could not use that image.'); return; }
+    modalPhoto = data; modalPhotoCleared = false;
+    const u = document.getElementById('p-photourl'); if (u) u.value = '';
+    renderPhotoPreview();
+  });
+}
+function photoFromUrl(v) {
+  const s = String(v || '').trim();
+  if (!s || /^(https?:|data:image\/)/i.test(s)) { modalPhoto = s; if (s) modalPhotoCleared = false; renderPhotoPreview(); }
+}
+function clearTripPhoto() {
+  modalPhoto = '';
+  modalPhotoCleared = true;      // deliberate: healSeedPhotos must not put it back
+  const u = document.getElementById('p-photourl'); if (u) u.value = '';
+  renderPhotoPreview();
+}
+// Drop an image file straight onto a card to set its photo.
+function photoDragOver(e) {
+  if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;  // a card being moved
+  e.preventDefault(); e.stopPropagation();
+  e.dataTransfer.dropEffect = 'copy';
+  e.currentTarget.classList.add('photo-hot');
+}
+function photoDragLeave(e) { e.currentTarget.classList.remove('photo-hot'); }
+function photoDrop(e, id) {
+  if (!e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;      // let the card move
+  e.preventDefault(); e.stopPropagation();
+  e.currentTarget.classList.remove('photo-hot');
+  const t = trips.find(x => x.id === id); if (!t) return;
+  downscaleImage(e.dataTransfer.files[0], (data, err) => {
+    if (!data) { toast(err || 'Could not use that image.'); return; }
+    t.photo = data;
+    saveState(); buildTripList();
+    toast('Photo set for ' + (t.dest || 'this trip'));
+  });
+}
+
+// ── Itinerary editor ──
+// A timeline you can read at a glance: a rail down the left, one dot per day, the day
+// label bold and the plan beside it. Rows can be reordered without retyping them.
+// ══════════════════════════════════════════════════════════════
+// THE PLAN - one list of things to do, each either waiting in "Ideas & must-do"
+// (day = null) or dropped onto a day (day = 1..N). The days themselves are never
+// stored: they are derived from the start and end dates every time we render, so
+// changing a date re-labels the whole itinerary on the spot.
+// ══════════════════════════════════════════════════════════════
+let modalPlan = [];             // [{ id, what, day }] - id is modal-local, for dragging
+let nextPlanUid = 1;
+
+// ── Start, end and duration are one thing seen three ways ──
+// Any two of them give the third, and a duration on its own is enough to plan: you get
+// Day 1..N with no dates on them, and the day a date lands they all get labelled.
+const MAX_TRIP_DAYS = 120;
+function isoPlusDays(iso, n) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function daysBetween(start, end) {
+  if (!start || !end) return 0;
+  const n = Math.round((new Date(end + 'T00:00:00') - new Date(start + 'T00:00:00')) / 86400000) + 1;
+  return n > 0 && n <= 400 ? n : 0;
+}
+// Fill in whichever of the three is missing. Never invents two from one.
+function resolveSpan(start, end, len) {
+  start = start || ''; end = end || '';
+  // An absurd duration is refused, not quietly clamped: silently turning "5000" into 120
+  // would hand back an end date nobody asked for.
+  len = Number(len) || 0;
+  if (!(len > 0) || len > MAX_TRIP_DAYS) len = 0;
+  if (start && end) return { start, end, len: daysBetween(start, end) || len };
+  if (start && len) return { start, end: isoPlusDays(start, len - 1), len };
+  if (end && len)   return { start: isoPlusDays(end, -(len - 1)), end, len };
+  return { start, end, len };
+}
+// The days of a trip. Dates when it has them, plain numbered days when it only has a length.
+function tripDayList(start, end, len) {
+  const s = resolveSpan(start, end, len);
+  if (!s.start) {
+    // A duration with no dates still gives you a board to plan on.
+    const n = Number(s.len) || 0;
+    const out = [];
+    for (let i = 0; i < n; i++) out.push({ n: i + 1, iso: '', date: '' });
+    return out;
+  }
+  const first = new Date(s.start + 'T00:00:00');
+  // No end date is a one-day trip; an end date that is backwards or absurd yields
+  // nothing at all (daysBetween returns 0 for both), never a bogus single day.
+  const n = s.end ? daysBetween(s.start, s.end) : 1;
+  if (!(n > 0) || n > MAX_TRIP_DAYS) return [];
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date(first.getTime() + i * 86400000);
+    out.push({ n: i + 1, iso: d.toISOString().slice(0, 10),
+               date: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) });
+  }
+  return out;
+}
+function modalDayList() {
+  const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  return tripDayList(g('p-start'), g('p-end'), g('p-len'));
+}
+// ── Importance, 1 to 5, picked not scrolled ──
+function renderWant() {
+  const host = document.getElementById('p-want-seg'); if (!host) return;
+  const cur = Number((document.getElementById('p-want') || {}).value) || 3;
+  const tips = { 1: 'someday maybe', 2: 'would be nice', 3: 'want to do it', 4: 'planning on it', 5: 'book it tomorrow' };
+  host.innerHTML = [1, 2, 3, 4, 5].map(n =>
+    `<button type="button" class="${n === cur ? 'on' : ''}" title="${escAttr(n + ' - ' + tips[n])}" onclick="setWant(${n})">${n}</button>`).join('');
+}
+function setWant(n) {
+  const el = document.getElementById('p-want'); if (el) el.value = String(Math.min(5, Math.max(1, n)));
+  renderWant();
+}
+function planItems(t) {
+  return Array.isArray(t.itinerary) ? t.itinerary : [];
+}
+// Everything the tile and the search need, without the modal being open.
+function planForDay(list, day) { return list.filter(x => x.day === day); }
+
+// One colour per day, cycled. Same muted register as the job board's stage columns.
+const DAY_COLORS = ['#7a8494', '#b9924a', '#9d7eb6', '#5a9a72', '#a56a6a', '#5f8ca8', '#a8895f'];
+function dayColor(n) { return DAY_COLORS[(Math.max(1, n) - 1) % DAY_COLORS.length]; }
+// An activity is ONE LINE: title, then where and how long in dimmer text. The rest of it
+// is in the hover panel, and clicking opens the editor.
+function planRowHTML(it) {
+  const bits = [`<b>${escHtml(it.what || '(untitled activity)')}</b>`];
+  const meta = [];
+  if (String(it.place || '').trim()) meta.push('📍 ' + escHtml(it.place));
+  if (String(it.dur   || '').trim()) meta.push('⏱ ' + escHtml(it.dur));
+  if (meta.length) bits.push(`<span class="pk-meta">${meta.join(' · ')}</span>`);
+  return `<div class="pk-card" draggable="true" data-plan="${it.id}"
+       ondragstart="planDragStart(event,${it.id})" ondragend="planDragEnd()"
+       ondragover="allowDropOnItem(event)" ondragleave="planDropLeave(event)" ondrop="dropOnPlanItem(event,${it.id})"
+       onclick="openActivity(${it.id})"
+       onmouseenter="showPlanTip(event,${it.id})" onmouseleave="hidePlanTip()">
+    <span class="pk-line">${bits.join(' ')}</span>
+    <button type="button" class="pk-x" title="Remove" onclick="event.stopPropagation();removePlanItem(${it.id})">✕</button>
+  </div>`;
+}
+// The plan is a kanban: the backlog across the top, one column per day underneath.
+function renderPlan() {
+  const host = document.getElementById('p-plan'); if (!host) return;
+  hidePlanTip();
+  const days = modalDayList();
+  // Items parked on a day that no longer exists come back to the backlog rather than vanish.
+  modalPlan.forEach(x => { if (x.day !== null && x.day > days.length) x.day = null; });
+  const waiting = planForDay(modalPlan, null);
+
+  const backlog = `<div class="pk-backlog${days.length ? '' : ' solo'}" ondragover="allowPlanDrop(event)" ondragleave="planDropLeave(event)" ondrop="dropOnDay(event,null)">
+    <div class="pk-head">📍 Activities to place <span class="pk-count">${waiting.length}</span></div>
+    <div class="pk-cards">${waiting.map(planRowHTML).join('')
+      || '<div class="pk-empty">Nothing waiting. Add an activity above, then drag it onto a day.</div>'}</div>
+  </div>`;
+
+  const cols = days.length
+    ? days.map(d => {
+        const on = planForDay(modalPlan, d.n);
+        return `<div class="pk-col" style="--kc:${dayColor(d.n)}" ondragover="allowPlanDrop(event)" ondragleave="planDropLeave(event)" ondrop="dropOnDay(event,${d.n})">
+          <div class="pk-head"><span class="pk-n">Day ${d.n}</span><span class="pk-date">${escHtml(d.date)}</span><span class="pk-count">${on.length}</span></div>
+          <div class="pk-body">${on.map(planRowHTML).join('') || '<div class="pk-empty">Drop one here.</div>'}</div>
+        </div>`;
+      }).join('')
+    : `<div class="plan-nodays">Set a duration, or a start and end date, and one column per day appears here ready to drop activities onto.</div>`;
+
+  host.innerHTML = backlog + `<div class="pk-cols">${cols}</div>`;
+}
+function addPlanIdea() {
+  const inp = document.getElementById('p-newidea'); if (!inp) return;
+  const text = inp.value.trim();
+  if (!text) return;
+  // A pasted block adds one activity per line, same as the old itinerary box did.
+  text.split(/\r?\n/).map(l => l.replace(/^\s*[-*•]\s*/, '').trim()).filter(Boolean)
+      .forEach(l => modalPlan.push({ id: nextPlanUid++, what: l, day: null, place: '', dur: '', desc: '' }));
+  inp.value = '';
+  renderPlan();
+  inp.focus();
+}
+function editPlanItem(id, v) { const it = modalPlan.find(x => x.id === id); if (it) it.what = v; }
+function removePlanItem(id) { modalPlan = modalPlan.filter(x => x.id !== id); renderPlan(); }
+
+// ── Hover: everything about the activity, without opening it ──
+// The panel is parked on the modal root and positioned in JS, because anything
+// absolutely positioned inside a scrolling kanban column gets clipped by it.
+function showPlanTip(e, id) {
+  const tip = document.getElementById('planTip'); if (!tip) return;
+  const it = modalPlan.find(x => x.id === id); if (!it) return;
+  const meta = [];
+  if (String(it.place || '').trim()) meta.push(`<span>📍 <b>${escHtml(it.place)}</b></span>`);
+  if (String(it.dur   || '').trim()) meta.push(`<span>⏱ <b>${escHtml(it.dur)}</b></span>`);
+  meta.push(`<span>${it.day == null ? 'not placed yet' : 'Day <b>' + it.day + '</b>'}</span>`);
+  tip.innerHTML = `<div class="pt-what">${escHtml(it.what || '(untitled activity)')}</div>
+    <div class="pt-meta">${meta.join('')}</div>
+    ${String(it.desc || '').trim() ? `<div class="pt-desc">${escHtml(it.desc)}</div>` : ''}
+    <div class="pt-hint">Click to edit, drag to move it to another day.</div>`;
+  tip.classList.add('on');
+  // Measure after it is visible, then keep it on screen.
+  const card = e.currentTarget.getBoundingClientRect();
+  const box = tip.getBoundingClientRect();
+  let left = card.right + 10;
+  if (left + box.width > window.innerWidth - 8) left = Math.max(8, card.left - box.width - 10);
+  let top = card.top;
+  if (top + box.height > window.innerHeight - 8) top = Math.max(8, window.innerHeight - box.height - 8);
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+}
+function hidePlanTip() {
+  const tip = document.getElementById('planTip');
+  if (tip) tip.classList.remove('on');
+}
+
+// ── The activity editor ──
+let editingActivity = null;
+function openActivity(id) {
+  const it = modalPlan.find(x => x.id === id); if (!it) return;
+  hidePlanTip();
+  editingActivity = id;
+  const set = (el, v) => { const n = document.getElementById(el); if (n) n.value = v; };
+  set('a-what', it.what || ''); set('a-place', it.place || '');
+  set('a-dur', it.dur || ''); set('a-desc', it.desc || '');
+  const title = document.getElementById('act-title');
+  if (title) title.textContent = it.day == null ? 'Activity (not placed yet)' : 'Activity on day ' + it.day;
+  document.getElementById('actModalBg').classList.add('open');
+  const w = document.getElementById('a-what'); if (w && w.focus) w.focus();
+}
+function closeActivity() {
+  document.getElementById('actModalBg').classList.remove('open');
+  editingActivity = null;
+}
+function saveActivity() {
+  const it = modalPlan.find(x => x.id === editingActivity);
+  if (it) {
+    const val = el => { const n = document.getElementById(el); return n ? String(n.value || '').trim() : ''; };
+    it.what = val('a-what'); it.place = val('a-place'); it.dur = val('a-dur'); it.desc = val('a-desc');
+  }
+  closeActivity();
+  renderPlan();
+}
+function deleteActivity() {
+  if (editingActivity !== null) modalPlan = modalPlan.filter(x => x.id !== editingActivity);
+  closeActivity();
+  renderPlan();
+}
+
+// ── Dragging an idea onto a day (same shape as the therapy log → session drop) ──
+let dragPlanId = null;
+function planDragStart(e, id) {
+  dragPlanId = id;
+  hidePlanTip();                                  // a panel following a card being dragged is noise
+  if (e.currentTarget && e.currentTarget.classList) e.currentTarget.classList.add('dragging');
+  if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', 'plan:' + id); } catch (err) {} }
+}
+function planDragEnd() {
+  dragPlanId = null;
+  document.querySelectorAll('.drop-on,.drop-here,.pk-card.dragging')
+    .forEach(n => n.classList.remove('drop-on', 'drop-here', 'dragging'));
+}
+function planDropLeave(e) { const t = e.currentTarget; if (t && t.classList) t.classList.remove('drop-on', 'drop-here'); }
+function allowPlanDrop(e) {
+  if (dragPlanId === null) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  const t = e.currentTarget; if (t && t.classList) t.classList.add('drop-on');
+}
+function allowDropOnItem(e) {
+  if (dragPlanId === null) return;
+  e.preventDefault();
+  if (e.stopPropagation) e.stopPropagation();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  const t = e.currentTarget; if (t && t.classList) t.classList.add('drop-here');
+}
+// Moving an item: onto a day (or back to the pool), optionally above a particular item.
+function movePlanItem(id, day, beforeId) {
+  const from = modalPlan.findIndex(x => x.id === id); if (from < 0) return;
+  const [it] = modalPlan.splice(from, 1);
+  it.day = day;
+  const to = beforeId == null ? -1 : modalPlan.findIndex(x => x.id === beforeId);
+  if (to < 0) modalPlan.push(it); else modalPlan.splice(to, 0, it);
+  renderPlan();
+}
+function draggedPlanId(e) {
+  if (dragPlanId !== null) return dragPlanId;
+  const raw = e.dataTransfer && e.dataTransfer.getData ? e.dataTransfer.getData('text/plain') : '';
+  return /^plan:(\d+)$/.test(raw) ? Number(RegExp.$1) : null;
+}
+function dropOnDay(e, day) {
+  if (e.preventDefault) e.preventDefault();
+  const t = e.currentTarget; if (t && t.classList) t.classList.remove('drop-on');
+  const id = draggedPlanId(e); dragPlanId = null;
+  if (id === null) return;
+  movePlanItem(id, day, null);          // dropped on the empty space: it goes to the bottom
+}
+function dropOnPlanItem(e, targetId) {
+  if (e.preventDefault) e.preventDefault();
+  if (e.stopPropagation) e.stopPropagation();
+  const t = e.currentTarget; if (t && t.classList) t.classList.remove('drop-here');
+  const id = draggedPlanId(e); dragPlanId = null;
+  if (id === null || id === targetId) return;
+  const target = modalPlan.find(x => x.id === targetId); if (!target) return;
+  movePlanItem(id, target.day, targetId);   // dropped on a card: it goes just above it
+}
+
+// ══════════════════════════════════════════════════════════════
+// THE CARD IS THREE TABS - Summary (what it is + the plan), Preparation
+// (who / how / cost + checklist) and Links. Each pane owns its height.
+// ══════════════════════════════════════════════════════════════
+const TRIP_TABS = ['summary', 'prep', 'links'];
+let tripTab = 'summary';
+function showTripTab(t) {
+  tripTab = TRIP_TABS.includes(t) ? t : 'summary';
+  TRIP_TABS.forEach(x => {
+    const pane = document.getElementById('tpane-' + x), tab = document.getElementById('ttab-' + x);
+    if (pane) pane.classList.toggle('on', x === tripTab);
+    if (tab) tab.classList.toggle('on', x === tripTab);
+  });
+  hidePlanTip();
+  // The kanban columns are laid out with flex against a height they only have once
+  // the pane is displayed, so the plan is drawn after the switch, not before.
+  if (tripTab === 'summary') renderPlan();
+}
+// Counts on the tabs, so you can see there is something on a pane without opening it.
+function refreshTripTabCounts() {
+  const left = modalItems.filter(i => !i.done).length;
+  const prep = document.getElementById('ttab-prep-n');
+  if (prep) prep.textContent = left ? String(left) : '';
+  const lk = document.getElementById('ttab-links-n');
+  if (lk) lk.textContent = modalLinks.length ? String(modalLinks.length) : '';
+}
+
+// ══════════════════════════════════════════════════════════════
+// LINKS - a real list, not a textarea: each one opens in a tab and says what it is.
+// Stored as `linkList: [{url, note}]`; the old newline-separated `links` string is
+// still written on save so search and older backups keep working.
+// ══════════════════════════════════════════════════════════════
+let modalLinks = [];
+// Only http(s) is ever put in an href: a stored "javascript:" must never become clickable.
+function safeUrl(u) {
+  const s = String(u || '').trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return '';        // some other scheme: not ours to open
+  return 'https://' + s;                                 // bare "adk.org/parking" still works
+}
+function linkLabel(u) {
+  const s = safeUrl(u);
+  if (!s) return 'no link yet';
+  try { return new URL(s).hostname.replace(/^www\./, ''); } catch (e) { return s.slice(0, 28); }
+}
+function parseLinkLines(text) {
+  return String(text || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(line => {
+    // "https://... - what it is" or "what it is: https://..."; either way the URL is the URL.
+    const m = line.match(/(https?:\/\/\S+|www\.\S+)/i);
+    if (!m) return { url: '', note: line };
+    const note = line.replace(m[0], '').replace(/^\s*[-:|·]\s*/, '').replace(/\s*[-:|·]\s*$/, '').trim();
+    return { url: m[0], note };
+  });
+}
+function tripLinks(t) {
+  if (Array.isArray(t.linkList)) return t.linkList;
+  return parseLinkLines(t.links);
+}
+let linkEditIdx = null;         // which row is open for editing, if any
+function renderTripLinks() {
+  refreshTripTabCounts();
+  const host = document.getElementById('p-linklist'); if (!host) return;
+  if (!modalLinks.length) {
+    host.innerHTML = '<div class="lk-empty">No links yet. Add the booking, the trail map, the forecast.</div>';
+    return;
+  }
+  host.innerHTML = modalLinks.map((l, i) => {
+    const href = safeUrl(l.url);
+    if (i === linkEditIdx) {
+      return `<div class="lk-row">
+        <div class="lk-edit">
+          <input class="lk-url" placeholder="https://..." value="${escAttr(l.url || '')}"
+                 oninput="editTripLink(${i},'url',this.value)"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();stopEditingLink();}">
+          <input class="lk-note" placeholder="What this is: the booking, the map, the forecast…" value="${escAttr(l.note || '')}"
+                 oninput="editTripLink(${i},'note',this.value)"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();stopEditingLink();}">
+        </div>
+        <button type="button" class="icon-btn" onclick="stopEditingLink()" title="Done">✓</button>
+        <button type="button" class="icon-btn" onclick="removeTripLink(${i})" title="Remove">✕</button>
+      </div>`;
+    }
+    // Not editing: the whole row is the link. Its description is the title, because that
+    // is what you are actually looking for; the address goes underneath it.
+    const title = String(l.note || '').trim() || linkLabel(l.url);
+    return `<div class="lk-row">
+      ${href ? `<a class="lk-open" href="${escAttr(href)}" target="_blank" rel="noopener noreferrer" title="${escAttr(href)}">
+                  <span class="lk-title">${escHtml(title)}</span>
+                  <span class="lk-host">🔗 ${escHtml(linkLabel(l.url))} ↗</span>
+                </a>`
+             : `<span class="lk-open dead">
+                  <span class="lk-title">${escHtml(title || '(nothing here yet)')}</span>
+                  <span class="lk-host">no address yet</span>
+                </span>`}
+      <button type="button" class="icon-btn" onclick="startEditingLink(${i})" title="Edit this link">✏️</button>
+      <button type="button" class="icon-btn" onclick="removeTripLink(${i})" title="Remove">✕</button>
+    </div>`;
+  }).join('');
+}
+function startEditingLink(i) {
+  linkEditIdx = i;
+  renderTripLinks();
+  const row = document.querySelectorAll('#p-linklist .lk-row')[i];
+  const inp = row && row.querySelector('.lk-url');
+  if (inp && inp.focus) inp.focus();
+}
+function stopEditingLink() { linkEditIdx = null; renderTripLinks(); }
+// Typing must not redraw the rows: the caret would go with them. Only the model changes.
+function editTripLink(i, field, v) { if (modalLinks[i]) modalLinks[i][field] = v; }
+function addTripLink() {
+  modalLinks.push({ url: '', note: '' });
+  startEditingLink(modalLinks.length - 1);       // a new link is always born in edit mode
+}
+function removeTripLink(i) {
+  modalLinks.splice(i, 1);
+  linkEditIdx = null;
+  renderTripLinks();
+}
+
+// ══════════════════════════════════════════════════════════════
+// DRAGGING A TRIP BETWEEN THE TWO SECTIONS
+// The sections are derived: a start date is what makes a trip Upcoming. So the drag is
+// not a stage change, it is a change of dates. Into Upcoming asks WHEN (there is nothing
+// sensible to invent); into Planned strips the dates but KEEPS the duration, so the day
+// columns and everything already dropped on them survive the round trip.
+// ══════════════════════════════════════════════════════════════
+let dragTripId = null;
+function tripDragStart(e, id) {
+  dragTripId = id;
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', 'trip:' + id); } catch (err) {}
+  }
+  if (e.currentTarget && e.currentTarget.classList) e.currentTarget.classList.add('dragging');
+}
+function tripDragEnd() {
+  dragTripId = null;
+  document.querySelectorAll('.trip-tile.dragging, .saved-list.drop-hot')
+    .forEach(n => n.classList.remove('dragging', 'drop-hot'));
+}
+// `trip:` prefixed, so a card dragged out of another app in the suite can never land here.
+function draggedTripId(e) {
+  if (dragTripId !== null) return dragTripId;
+  const raw = e.dataTransfer && e.dataTransfer.getData ? e.dataTransfer.getData('text/plain') : '';
+  return /^trip:(\d+)$/.test(raw) ? Number(RegExp.$1) : null;
+}
+function tripSectionOver(e) {
+  if (dragTripId === null) return;            // a photo file drop, or nothing of ours
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  const el = e.currentTarget; if (el && el.classList) el.classList.add('drop-hot');
+}
+function tripSectionLeave(e) {
+  const el = e.currentTarget; if (el && el.classList) el.classList.remove('drop-hot');
+}
+function dropOnUpcoming(e) {
+  if (e.preventDefault) e.preventDefault();
+  tripSectionLeave(e);
+  const id = draggedTripId(e); dragTripId = null;
+  const t = id === null ? null : trips.find(x => x.id === id);
+  if (!t) return;
+  if (t.start) return;                        // already Upcoming: dropping it there is a no-op
+  openTripDate(t.id);                         // Upcoming means dated, so it has to ask
+}
+function dropOnPlanned(e) {
+  if (e.preventDefault) e.preventDefault();
+  tripSectionLeave(e);
+  const id = draggedTripId(e); dragTripId = null;
+  const t = id === null ? null : trips.find(x => x.id === id);
+  if (!t) return;
+  if (!t.start && !t.end) return;             // already Planned
+  // Keep how long it is, lose only when. The plan is stored by day NUMBER, so nothing
+  // that has been dropped onto a day is lost.
+  if (!t.lenDays) t.lenDays = daysBetween(t.start, t.end) || '';
+  t.start = ''; t.end = '';
+  saveState(); buildTripList();
+  toast(t.dest + ' moved to Planned' + (t.lenDays ? ', still a ' + t.lenDays + ' day plan' : ''));
+}
+// ── "When does it start?" ──
+let datingTrip = null;
+function openTripDate(id) {
+  const t = trips.find(x => x.id === id); if (!t) return;
+  datingTrip = id;
+  const set = (el, v) => { const n = document.getElementById(el); if (n) n.value = v; };
+  const title = document.getElementById('dt-title');
+  if (title) title.textContent = 'When does ' + (t.dest || 'this trip') + ' start?';
+  set('dt-start', '');
+  set('dt-len', t.lenDays ? String(t.lenDays) : '');
+  dtChanged();
+  document.getElementById('dateModalBg').classList.add('open');
+  const s = document.getElementById('dt-start'); if (s && s.focus) s.focus();
+}
+function closeTripDate() {
+  document.getElementById('dateModalBg').classList.remove('open');
+  datingTrip = null;
+}
+function dtChanged() {
+  const g = id => { const n = document.getElementById(id); return n ? n.value : ''; };
+  const el = document.getElementById('dt-end'); if (!el) return;
+  const span = resolveSpan(g('dt-start'), '', g('dt-len'));
+  el.textContent = span.start && span.end
+    ? 'Ends ' + fmtLong(span.end) + ', ' + span.len + ' days'
+    : span.start ? 'Add a number of days and the end date follows.' : 'Pick a start date.';
+}
+function saveTripDate() {
+  const t = trips.find(x => x.id === datingTrip);
+  const g = id => { const n = document.getElementById(id); return n ? n.value : ''; };
+  const span = resolveSpan(g('dt-start'), '', g('dt-len'));
+  if (!t || !span.start) { toast('A start date is what moves it to Upcoming.'); return; }
+  t.start = span.start;
+  t.end = span.end || span.start;
+  t.lenDays = span.len || daysBetween(t.start, t.end) || '';
+  closeTripDate();
+  saveState(); buildTripList();
+  toast(t.dest + ' is on for ' + fmtLong(t.start));
+}
+function fmtLong(iso) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+}
+
+// ── Who is coming, as tags ──
+function renderPeople() {
+  const host = document.getElementById('p-people'); if (!host) return;
+  host.innerHTML = modalPeople.length
+    ? modalPeople.map((p, i) => `<span class="tag">${escHtml(p)}<button type="button" onclick="removePerson(${i})" title="Remove">✕</button></span>`).join('')
+    : '<span class="tag-empty">Nobody added yet.</span>';
+}
+function addPerson() {
+  const inp = document.getElementById('p-newperson');
+  // One name, or several at once: "Sam, Maxime".
+  String(inp.value || '').split(/\s*(?:,|\+|&|\band\b)\s*/i).map(s => s.trim()).filter(Boolean)
+    .forEach(n => { if (!modalPeople.some(p => p.toLowerCase() === n.toLowerCase())) modalPeople.push(n); });
+  inp.value = '';
+  renderPeople();
+  inp.focus();
+}
+function removePerson(i) { modalPeople.splice(i, 1); renderPeople(); }
+
+// Live budget preview while the modal is open.
+function refreshBudgetPreview() {
+  const host = document.getElementById('p-budgetbar'); if (!host) return;
+  const g = id => document.getElementById(id).value;
+  host.innerHTML = budgetBarHTML({ budget: g('p-budget'), spent: g('p-spent'), currency: g('p-currency') || 'CAD' });
+}
+
+// ── Modal ──
+function openTripModal(id) {
+  editingTrip = id || null;
+  const t = id ? trips.find(x => x.id === id) : {};
+  const set = (el, v) => { document.getElementById(el).value = v; };
+  set('p-dest',      t.dest      || '');
+  set('p-name',      t.name      || '');
+  set('p-status',    TRIP_STATUS_ORDER.includes(t.status) ? t.status : 'Planning');
+  set('p-kind',      TRIP_KINDS.some(k => k.id === t.kind) ? t.kind : 'Travel');
+  set('p-want',      String(t.want || 3));
+  set('p-len',       t.lenDays ? String(t.lenDays) : '');
+  renderWant();
+  set('p-start',     t.start     || '');
+  set('p-end',       t.end       || '');
+  set('p-newperson', '');
+  set('p-transport', t.transport || '');
+  set('p-stay',      t.stay      || '');
+  set('p-budget',    t.budget    || '');
+  set('p-spent',     t.spent     || '');
+  set('p-currency',  t.currency  || 'CAD');
+  set('p-notes',     t.notes     || '');
+  set('p-newitem',   '');
+  set('p-newidea',   '');
+  modalPhoto = t.photo || '';
+  modalPhotoCleared = !!t.photoCleared;
+  // A pasted link is editable as text; an uploaded photo is a data URL and stays in the preview.
+  set('p-photourl', /^data:/.test(modalPhoto) ? '' : modalPhoto);
+  renderPhotoPreview();
+  nextPlanUid = 1;
+  modalPlan = planItems(t).map(x => ({ id: nextPlanUid++, what: x.what || '', day: x.day == null ? null : Number(x.day),
+                                       place: x.place || '', dur: x.dur || '', desc: x.desc || '' }));
+  modalPeople = (Array.isArray(t.people) ? t.people : []).slice();
+  renderPeople();
+  modalItems = tripItems(t).map(i => ({ text: i.text || '', done: !!i.done }));
+  renderTripItems();
+  modalLinks = tripLinks(t).map(l => ({ url: l.url || '', note: l.note || '' }));
+  linkEditIdx = null;
+  renderTripLinks();
+  refreshBudgetPreview();
+  refreshTripCount();
+  document.getElementById('tripModalBg').classList.add('open');
+  showTripTab('summary');       // draws the plan too, now that the pane has a height
+}
+function closeTripModal() {
+  closeActivity();
+  hidePlanTip();
+  document.getElementById('tripModalBg').classList.remove('open');
+  editingTrip = null; modalItems = []; modalPlan = []; modalPeople = []; modalLinks = []; modalPhoto = ''; dragPlanId = null;
+}
+// Changing a date re-labels the whole itinerary on the spot: the days are derived, never stored.
+// Start, end and days are three views of one span, so editing one fills in what it implies:
+// whichever field you did NOT touch is the one that moves.
+function datesChanged() { refreshTripCount(); renderPlan(); }
+function spanFields() {
+  const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const s = id => document.getElementById(id);
+  return { start: g('p-start'), end: g('p-end'), len: g('p-len'), set: (id, v) => { const el = s(id); if (el) el.value = v; } };
+}
+function startChanged() {
+  const f = spanFields();
+  if (f.start && f.len) f.set('p-end', isoPlusDays(f.start, Math.max(1, Number(f.len)) - 1));
+  else if (f.start && f.end) f.set('p-len', String(daysBetween(f.start, f.end) || ''));
+  datesChanged();
+}
+function endChanged() {
+  const f = spanFields();
+  if (f.start && f.end) f.set('p-len', String(daysBetween(f.start, f.end) || ''));
+  else if (f.end && f.len) f.set('p-start', isoPlusDays(f.end, -(Math.max(1, Number(f.len)) - 1)));
+  datesChanged();
+}
+function lenChanged() {
+  const f = spanFields();
+  const n = Math.max(0, Math.min(MAX_TRIP_DAYS, Number(f.len) || 0));
+  if (n && f.start)    f.set('p-end', isoPlusDays(f.start, n - 1));
+  else if (n && f.end) f.set('p-start', isoPlusDays(f.end, -(n - 1)));
+  datesChanged();
+}
+// Live countdown/duration in the modal header as the dates are typed.
+function refreshTripCount() {
+  const el = document.getElementById('p-countbig'); if (!el) return;
+  const draft = { start: document.getElementById('p-start').value, end: document.getElementById('p-end').value };
+  const cd = tripCountdown(draft), d = tripDays(draft);
+  if (!cd && !d) { el.innerHTML = ''; return; }
+  const cls = cd && cd.cls === 'now' ? 'c-now' : cd && cd.cls === 'soon' ? 'c-soon' : '';
+  el.innerHTML = `<span class="countbig ${cls}">${cd ? cd.label : d + 'd'}</span><span class="fitbig-sub">${d ? d + ' days away from home' : 'set an end date'}</span>`;
+}
+// To do / Done board inside the modal. Text edits mutate in place (no re-render, so
+// the caret stays put); checking an item re-renders to move it across the columns.
+// One list. Checking an item strikes it and sinks it to the bottom; no second column.
+function renderTripItems() {
+  refreshTripTabCounts();
+  const host = document.getElementById('p-items'); if (!host) return;
+  const rows = modalItems.map((it, i) => ({ it, i }))
+    .sort((a, b) => (a.it.done ? 1 : 0) - (b.it.done ? 1 : 0));
+  const done = modalItems.filter(i => i.done).length;
+  const row = ({ it, i }) => `<div class="ti-row${it.done ? ' is-done' : ''}">
+    <input type="checkbox" ${it.done ? 'checked' : ''} onchange="toggleTripItem(${i})" title="Done">
+    <input class="ti-txt" type="text" value="${escAttr(it.text || '')}" oninput="editTripItem(${i},this.value)" placeholder="Item">
+    <button type="button" class="icon-btn" onclick="removeTripItem(${i})" title="Remove">✕</button>
+  </div>`;
+  host.innerHTML = modalItems.length
+    ? `<div class="ti-count">${done} of ${modalItems.length} done</div>` + rows.map(row).join('')
+    : '<div class="ti-empty">Nothing on the list yet.</div>';
+}
+function addTripItem() {
+  const inp = document.getElementById('p-newitem');
+  const text = inp.value.trim();
+  if (!text) return;
+  modalItems.push({ text, done: false });
+  inp.value = '';
+  renderTripItems();
+  inp.focus();
+}
+function toggleTripItem(i) { if (!modalItems[i]) return; modalItems[i].done = !modalItems[i].done; renderTripItems(); }
+function editTripItem(i, v) { if (modalItems[i]) modalItems[i].text = v; }
+function removeTripItem(i) { modalItems.splice(i, 1); renderTripItems(); }
+
+// Returns true if it saved. `quiet` is for the automatic save when the card closes: it
+// says why it could not save instead of stopping you with an alert.
+function saveTrip(opts) {
+  const quiet = !!(opts && opts.quiet);
+  const refuse = msg => { if (quiet) toast(msg); else alert(msg); return false; };
+  const dest = document.getElementById('p-dest').value.trim();
+  if (!dest) return refuse('A destination is required.');
+  const val = el => document.getElementById(el).value.trim();
+  // Whatever two of start / end / days are filled in decide the third.
+  const span = resolveSpan(document.getElementById('p-start').value || '',
+                           document.getElementById('p-end').value || '',
+                           document.getElementById('p-len').value || '');
+  const start = span.start, end = span.end;
+  if (start && end && end < start) return refuse('The end date is before the start date.');
+  const links = modalLinks.map(l => ({ url: String(l.url || '').trim(), note: String(l.note || '').trim() }))
+                          .filter(l => l.url || l.note);
+  const data = {
+    dest,
+    name:      val('p-name'),
+    status:    document.getElementById('p-status').value,
+    kind:      document.getElementById('p-kind').value,
+    want:      Math.min(WANT_MAX, Math.max(1, Number(document.getElementById('p-want').value) || 3)),
+    lenDays:   span.len || '',
+    start, end,
+    people:    modalPeople.map(x => String(x).trim()).filter(Boolean),
+    transport: val('p-transport'),
+    stay:      val('p-stay'),
+    budget:    val('p-budget'),
+    spent:     val('p-spent'),
+    currency:  val('p-currency') || 'CAD',
+    linkList:  links,
+    // The old newline string is still written: the search and older backups read it.
+    links:     links.map(l => [l.url, l.note].filter(Boolean).join(' - ')).join('\n'),
+    notes:     val('p-notes'),
+    photo:     modalPhoto || '',
+    photoCleared: !modalPhoto && modalPhotoCleared,
+    itinerary: modalPlan.map(x => ({ what: (x.what || '').trim(), day: x.day == null ? null : Number(x.day),
+                                     place: (x.place || '').trim(), dur: (x.dur || '').trim(), desc: (x.desc || '').trim() }))
+                        .filter(x => x.what),
+    items:     modalItems.map(i => ({ text: (i.text || '').trim(), done: !!i.done })).filter(i => i.text),
+  };
+  if (editingTrip) { const t = trips.find(x => x.id === editingTrip); if (t) Object.assign(t, data); }
+  else trips.push({ id: nextTripId++, flagged: false, archived: false, ...data });
+  saveState(); closeTripModal(); buildTripList();
+  return true;
+}
+// ── Closing the card is not the same as throwing it away ──
+// Clicking outside it, or pressing Esc, SAVES. Only Cancel discards. Losing ten minutes
+// of typing to a stray click on the backdrop is the kind of thing you forgive once.
+function closeTripModalSaving() {
+  const bg = document.getElementById('tripModalBg');
+  if (!bg || !bg.classList.contains('open')) return true;
+  // An activity editor open on top of it: fold that in first, or its edits are lost.
+  const act = document.getElementById('actModalBg');
+  if (act && act.classList.contains('open')) saveActivity();
+  // A brand new card with nothing on it is a card you opened by mistake. Let it go
+  // rather than demanding a destination for something you never started.
+  if (editingTrip === null && tripCardIsEmpty()) { closeTripModal(); return true; }
+  // If it cannot be saved, say why and leave the card open rather than binning the work.
+  return saveTrip({ quiet: true });
+}
+function tripCardIsEmpty() {
+  const g = id => { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  return !g('p-dest') && !g('p-name') && !g('p-notes') && !g('p-transport') && !g('p-stay')
+      && !g('p-budget') && !g('p-start') && !g('p-end') && !g('p-len')
+      && !modalPlan.length && !modalItems.length && !modalPeople.length && !modalLinks.length && !modalPhoto;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// QUICK ADD - paste trip information, get a card.
+// Understands labelled lines (Destination:, Dates:, Budget:, Itinerary:) and loose
+// one-liners like "Lima, Peru · Aug 10-24 2026 · budget 3200 CAD · with Sam".
+// It never throws: whatever it cannot place ends up in the notes.
+// ═══════════════════════════════════════════════════════════════
+const MONTHS = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12,
+                 fev:2, avr:4, mai:5, jui:6, aou:8, déc:12, dic:12, ene:1, abr:4, ago:8, set:9 };
+const CURRENCIES = ['CAD','USD','EUR','GBP','MXN','PEN','CLP','BRL','JPY','CHF','AUD','COP','ARS'];
+const DATE_SEP = String.raw`(?:-|–|—|→|\bto\b|\bau\b|\buntil\b|\bjusqu'au\b|\bthrough\b)`;
+
+function monthNum(w) { return MONTHS[String(w || '').slice(0, 3).toLowerCase()] || 0; }
+function isoDate(y, m, d) {
+  if (!y || !m || !d || m > 12 || d > 31) return '';
+  return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+}
+// A year was not given: assume the next time this date comes around.
+function guessYear(m, d) {
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const y = now.getFullYear();
+  const cand = new Date(isoDate(y, m, d) + 'T00:00:00');
+  return (cand - now) / 86400000 < -30 ? y + 1 : y;
+}
+// One date in any of the shapes people actually type.
+function parseDateToken(s, yearHint) {
+  const str = String(s || '').trim();
+  let m = str.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return isoDate(+m[1], +m[2], +m[3]);
+  m = str.match(/^([a-zà-ÿ]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})?$/i);   // Aug 12, 2026
+  if (m && monthNum(m[1])) { const mo = monthNum(m[1]), d = +m[2]; return isoDate(+m[3] || yearHint || guessYear(mo, d), mo, d); }
+  m = str.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([a-zà-ÿ]{3,9})\.?,?\s*(\d{4})?$/i);   // 12 August 2026
+  if (m && monthNum(m[2])) { const mo = monthNum(m[2]), d = +m[1]; return isoDate(+m[3] || yearHint || guessYear(mo, d), mo, d); }
+  return '';
+}
+// A range anywhere in a blob of text: ISO to ISO, "Aug 10-24 2026", "Aug 10 to Sep 2".
+// `match` is the exact text consumed, so a caller can strip it and keep reading the rest.
+function parseDateRange(text) {
+  const s = String(text || '');
+  let m = s.match(new RegExp(String.raw`(\d{4}-\d{1,2}-\d{1,2})\s*` + DATE_SEP + String.raw`\s*(\d{4}-\d{1,2}-\d{1,2})`, 'i'));
+  if (m) return { start: parseDateToken(m[1]), end: parseDateToken(m[2]), match: m[0] };
+  m = s.match(new RegExp(String.raw`([a-zà-ÿ]{3,9})\.?\s*(\d{1,2})(?:st|nd|rd|th)?\s*` + DATE_SEP +
+                         String.raw`\s*(?:([a-zà-ÿ]{3,9})\.?\s*)?(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?`, 'i'));
+  if (m && monthNum(m[1])) {
+    const m1 = monthNum(m[1]), d1 = +m[2], m2 = monthNum(m[3]) || m1, d2 = +m[4];
+    const crosses = m2 < m1;          // second month earlier: the trip runs over new year
+    const given = +m[5] || 0;
+    // A year written at the end belongs to the LAST date: "Dec 28 - Jan 4, 2027" starts in 2026.
+    const ys = given ? (crosses ? given - 1 : given) : guessYear(m1, d1);
+    const ye = crosses ? ys + 1 : ys;
+    return { start: isoDate(ys, m1, d1), end: isoDate(ye, m2, d2), match: m[0] };
+  }
+  m = s.match(/(\d{4}-\d{1,2}-\d{1,2})|([a-zà-ÿ]{3,9}\.?\s+\d{1,2}(?:st|nd|rd|th)?,?(?:\s*\d{4})?)/i);
+  if (m) { const one = parseDateToken((m[1] || m[2] || '').trim()); if (one) return { start: one, end: '', match: m[0] }; }
+  return { start: '', end: '', match: '' };
+}
+function parseMoney(text) {
+  const s = String(text || '');
+  const m = s.match(/(?:\$|\b)(\d[\d  ,]*(?:\.\d{1,2})?)\s*(?:\$)?\s*([A-Za-z]{3})?/);
+  if (!m) return { amount: '', currency: '', match: '' };
+  const amount = m[1].replace(/[  ,]/g, '');
+  const code = (m[2] || '').toUpperCase();
+  return { amount: String(Number(amount) || ''), currency: CURRENCIES.includes(code) ? code : '', match: m[0] };
+}
+function findCurrency(text) {
+  const m = String(text || '').toUpperCase().match(new RegExp('\\b(' + CURRENCIES.join('|') + ')\\b'));
+  return m ? m[1] : '';
+}
+// "Aug 12 - Cusco" / "Day 3: Sacred Valley" splits into when + what; anything else is all "what".
+// Only the parser uses this now - the plan itself stores a day number, not free text - but
+// pasted text still arrives in this shape, so parseTripText converts at the end.
+function splitItinLine(line) {
+  const m = String(line || '').match(/^\s*([^—–:-]{1,22}?)\s*[—–:-]\s*(.+)$/);
+  if (m && /\d|^(day|jour|morning|afternoon|evening|matin|soir)/i.test(m[1].trim())) {
+    return { when: m[1].trim(), what: m[2].trim() };
+  }
+  return { when: '', what: String(line || '').trim() };
+}
+
+const QA_LABELS = [
+  ['dest',      /^(destination|dest|where|place|lieu|país|pais|country|city)$/i],
+  ['name',      /^(trip|name|title|nom|titre|trip name)$/i],
+  ['dates',     /^(dates?|when|quand|période|periode|duration)$/i],
+  ['start',     /^(start|from|depart|départ|leaving|début|debut)$/i],
+  ['end',       /^(end|to|return|retour|back|fin)$/i],
+  ['travelers', /^(who|travel(l)?ers|with|people|avec|qui|guests)$/i],
+  ['transport', /^(transport|how|flight|vol|travel by|getting there|mode)$/i],
+  ['stay',      /^(stay|accommodation|hotel|lodging|logement|where to stay|sleep)$/i],
+  ['budget',    /^(budget|cost|price|prix|coût|cout|total)$/i],
+  ['spent',     /^(spent|paid|dépensé|depense|so far)$/i],
+  ['currency',  /^(currency|devise)$/i],
+  ['status',    /^(stage|status|statut|état|etat)$/i],
+  ['want',      /^(want|priority|importance|prio|score|envie)$/i],
+  ['kind',      /^(kind|type|category|catégorie|categorie)$/i],
+  ['ideas',     /^(ideas?|places|must.?do|see|to see|à voir|a voir|highlights)$/i],
+  ['links',     /^(links?|urls?|booking|réservation|reservation)$/i],
+  ['notes',     /^(notes?|remarks?|comment(s|aires)?)$/i],
+  ['itinerary', /^(itinerary|itinéraire|itineraire|plan|schedule|programme|program|days?)$/i],
+];
+function labelKey(raw) {
+  const l = String(raw || '').trim();
+  for (const [key, re] of QA_LABELS) if (re.test(l)) return key;
+  return '';
+}
+function parseTripText(raw) {
+  const t = { dest:'', name:'', start:'', end:'', travelers:'', transport:'', stay:'',
+              budget:'', spent:'', currency:'', ideas:'', links:'', notes:'', itinerary:[],
+              status:'', want:0, kind:'', people:[] };
+  const leftovers = [];
+  const text = String(raw || '');
+  if (!text.trim()) return t;
+
+  const lines = text.split(/\r?\n/);
+  let inItinerary = false;
+  const put = (key, val) => {
+    const v = String(val || '').trim();
+    if (!v) return;
+    if (key === 'dates') { const r = parseDateRange(v); if (r.start) t.start = r.start; if (r.end) t.end = r.end; return; }
+    if (key === 'start' || key === 'end') { const d = parseDateToken(v) || parseDateRange(v).start; if (d) t[key] = d; return; }
+    if (key === 'budget' || key === 'spent') {
+      const m = parseMoney(v);
+      if (m.amount) t[key] = m.amount;
+      if (m.currency && !t.currency) t.currency = m.currency;
+      return;
+    }
+    if (key === 'status') { const s = TRIP_STATUS_ORDER.find(x => x.toLowerCase() === v.toLowerCase()) || LEGACY_STATUS[v]; if (s) t.status = s; return; }
+    if (key === 'want')   { const n = Number(String(v).replace(/[^0-9]/g, '')) || LEGACY_WANT[v] || 0; if (n) t.want = Math.min(WANT_MAX, Math.max(1, n)); return; }
+    if (key === 'kind')   { const k = TRIP_KINDS.find(x => x.id.toLowerCase() === v.toLowerCase().replace(/one[- ]time event/i, 'event')); if (k) t.kind = k.id; return; }
+    if (key === 'itinerary') { t.itinerary.push(splitItinLine(v)); return; }
+    if (key === 'travelers') {   // becomes the "who is coming" tags
+      v.split(/\s*(?:,|\+|&|\band\b|\bet\b)\s*/i).map(x => x.trim()).filter(Boolean)
+       .forEach(n => { if (!t.people.some(p => p.toLowerCase() === n.toLowerCase())) t.people.push(n); });
+      return;
+    }
+    t[key] = t[key] ? t[key] + (key === 'ideas' || key === 'links' || key === 'notes' ? '\n' : ', ') + v : v;
+  };
+
+  lines.forEach(line => {
+    const bare = line.trim();
+    if (!bare) return;
+    const lm = bare.match(/^\s*[-*•]?\s*([A-Za-zà-ÿ' ]{2,22})\s*:\s*(.*)$/);
+    if (lm && labelKey(lm[1])) {
+      const key = labelKey(lm[1]);
+      inItinerary = (key === 'itinerary');
+      if (inItinerary) { if (lm[2].trim()) t.itinerary.push(splitItinLine(lm[2])); return; }
+      put(key, lm[2]);
+      return;
+    }
+    // Inside an itinerary block, or any "Day 3: …" / "Aug 12 — …" line.
+    if (inItinerary || /^\s*[-*•]?\s*(day|jour)\s*\d/i.test(bare) ||
+        /^\s*[-*•]?\s*(\d{4}-\d{2}-\d{2}|[a-zà-ÿ]{3,9}\.?\s+\d{1,2})\s*[—–:-]/i.test(bare)) {
+      t.itinerary.push(splitItinLine(bare.replace(/^\s*[-*•]\s*/, '')));
+      return;
+    }
+    // Not labelled: split on the separators people use in a one-liner and classify each piece.
+    bare.split(/\s+[·|]\s+|\s{3,}/).forEach(piece => {
+      // Dates and money are cut OUT of the piece, so "Gaspésie Jul 3-12" still yields a
+      // destination instead of being swallowed whole by the date.
+      let rest = piece.trim(); if (!rest) return;
+      const tidy = s => s.replace(/\s{2,}/g, ' ').replace(/^[\s,;:·\-–—]+|[\s,;:·\-–—]+$/g, '').trim();
+      const range = parseDateRange(rest);
+      if (range.start) {
+        t.start = t.start || range.start;
+        t.end = t.end || range.end;
+        rest = tidy(rest.replace(range.match, ' '));
+      }
+      if (/budget|cost|prix|spent|paid|dépens|\$|\b(cad|usd|eur|gbp|mxn|pen|clp)\b/i.test(rest) && /\d/.test(rest)) {
+        const m = parseMoney(rest);
+        if (m.amount) {
+          if (/spent|paid|dépens/i.test(rest)) t.spent = t.spent || m.amount;
+          else t.budget = t.budget || m.amount;
+          if (m.currency && !t.currency) t.currency = m.currency;
+          rest = tidy(rest.replace(m.match, ' ').replace(/\b(budget|cost|prix|spent|paid|dépensé|de)\b/gi, ' '));
+        }
+      }
+      if (!rest) return;
+      // "Road trip to Gaspésie" names the place, not the transport, so this is read first.
+      const tripTo = rest.match(/^(?:road ?trip|trip|voyage|vacation|holidays?)\s+(?:to|in|en|à|a)\s+(.+)$/i);
+      if (tripTo && !t.dest) { t.dest = tripTo[1].trim(); return; }
+      if (/^(with|avec|w\/)\s+/i.test(rest)) { put('travelers', rest.replace(/^(with|avec|w\/)\s+/i, '')); return; }
+      if (/^(flight|plane|car|road ?trip|train|bus|boat|ferry|drive|driving|vol|avion|voiture|bateau)\b/i.test(rest)) { put('transport', rest); return; }
+      if (/^(airbnb|hotel|hostel|camping|family|friends|resort|auberge|h[ôo]tel)\b/i.test(rest)) { put('stay', rest); return; }
+      if (/^https?:\/\//i.test(rest)) { put('links', rest); return; }
+      if (!t.dest) { t.dest = rest.replace(/^(road ?trip|trip|voyage)\s+(to|in|en|à|a)\s+/i, ''); return; }
+      if (!t.name && rest.length <= 60 && !/[.!?]$/.test(rest)) { t.name = rest; return; }
+      leftovers.push(rest);
+    });
+  });
+
+  if (!t.currency) t.currency = findCurrency(text);
+  if (leftovers.length) t.notes = (t.notes ? t.notes + '\n' : '') + leftovers.join('\n');
+  if (t.start && t.end && t.end < t.start) t.end = '';     // a misread range is worse than none
+  // The parser works in {when, what} because that is what pasted text looks like. The plan
+  // stores {what, day}, so convert once at the end, when the dates are finally known.
+  t.itinerary = t.itinerary.map(x => {
+    const when = String(x.when || '').trim(), what = String(x.what || '').trim();
+    const day = legacyPlanDay(when, t.start, t.end);
+    return { what: (day === null && when) ? (when + ' - ' + what).replace(/ - $/, '') : what, day };
+  }).filter(x => x.what);
+  // Anything pasted under "Places / ideas" joins the same list, waiting for a day.
+  if (String(t.ideas || '').trim()) {
+    String(t.ideas).split(/\r?\n/).map(l => l.replace(/^\s*[-*\u2022]\s*/, '').trim()).filter(Boolean)
+      .forEach(l => t.itinerary.push({ what: l, day: null }));
+    t.ideas = '';
+  }
+  return t;
+}
+// The paste box is gone. Paste trip text anywhere on the board instead and the card opens
+// pre-filled, so you review what was read before it becomes a trip.
+function quickAddTrip(raw) {
+  if (!String(raw || '').trim()) { toast('Nothing to read in that paste.'); return false; }
+  const p = parseTripText(raw);
+  if (!p.dest) { toast('No destination found in that text - start with the place name.'); return false; }
+  openTripModal();
+  const set = (el, v) => { const n = document.getElementById(el); if (n) n.value = v; };
+  set('p-dest', p.dest);
+  set('p-name', p.name || '');
+  set('p-status', TRIP_STATUS_ORDER.includes(p.status) ? p.status : 'Planning');
+  set('p-kind', p.kind || (/road ?trip/i.test(p.transport || '') ? 'Road trip' : 'Travel'));
+  set('p-want', String(p.want || 3));
+  renderWant();
+  set('p-len', p.lenDays ? String(p.lenDays) : '');
+  set('p-start', p.start || '');
+  set('p-end', p.end || '');
+  set('p-transport', p.transport || '');
+  set('p-stay', p.stay || '');
+  set('p-budget', p.budget || '');
+  set('p-spent', p.spent || '');
+  set('p-currency', p.currency || 'CAD');
+  set('p-notes', p.notes || '');
+  modalLinks = parseLinkLines(p.links);
+  renderTripLinks();
+  modalPeople = (p.people || []).slice();
+  renderPeople();
+  nextPlanUid = 1;
+  modalPlan = (p.itinerary || []).map(x => ({ id: nextPlanUid++, what: x.what || '', day: x.day == null ? null : Number(x.day),
+                                              place: x.place || '', dur: x.dur || '', desc: x.desc || '' }));
+  refreshBudgetPreview(); refreshTripCount();
+  showTripTab('summary');
+  const got = [p.start ? 'dates' : '', p.budget ? 'budget' : '',
+               (p.itinerary || []).length ? p.itinerary.length + ' stops' : ''].filter(Boolean).join(', ');
+  toast('Read ' + p.dest + (got ? ' (' + got + ')' : '') + ' - check it and Save.');
+  return true;
+}
+// Paste anywhere on the board. Ignored while you are typing in a field or while the card
+// is already open, so a normal copy-paste into an input still behaves like a paste.
+function onBoardPaste(e) {
+  const modal = document.getElementById('tripModalBg');
+  if (modal && modal.classList.contains('open')) return;
+  const el = e.target;
+  if (el && el.closest && el.closest('input, textarea, select, [contenteditable="true"]')) return;
+  const text = e.clipboardData && e.clipboardData.getData ? e.clipboardData.getData('text/plain') : '';
+  if (!text || text.trim().length < 3) return;
+  e.preventDefault();
+  quickAddTrip(text);
+}
+
+// ── Theme (light / dark) ──
+function applyTheme(mode) {
+  document.documentElement.setAttribute('data-theme', mode);
+  const lbl = document.getElementById('themeLabel');
+  if (lbl) lbl.textContent = mode === 'light' ? 'Dark theme' : 'Light theme';
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const next = cur === 'light' ? 'dark' : 'light';
+  localStorage.setItem(LS_THEME, next);
+  applyTheme(next);
+}
+(function () {
+  const incoming = themeFromUrl();                 // arrived from another app
+  if (incoming) localStorage.setItem(LS_THEME, incoming);
+  applyTheme((incoming || localStorage.getItem(LS_THEME)) === 'light' ? 'light' : 'dark');
+})();
+
+// ── Settings popover ──
+function toggleSettings(e) {
+  if (e) e.stopPropagation();
+  const m = document.getElementById('settingsMenu');
+  if (m.hidden) { m.hidden = false; setTimeout(() => document.addEventListener('click', outsideSettings), 0); }
+  else hideSettings();
+}
+function hideSettings() {
+  document.getElementById('settingsMenu').hidden = true;
+  document.removeEventListener('click', outsideSettings);
+}
+function outsideSettings(e) {
+  const m = document.getElementById('settingsMenu');
+  if (!m.contains(e.target) && !e.target.closest('.settings-btn')) hideSettings();
+}
+
+// ── Misc ──
+// Clicking the backdrop saves and closes. It used to just hide the card, which threw
+// away everything typed since it was opened.
+document.getElementById('tripModalBg').addEventListener('click', function(e){
+  if (e.target === this) closeTripModalSaving();
+});
+// Same for the activity editor sitting on top of it.
+document.getElementById('actModalBg').addEventListener('click', function(e){
+  if (e.target === this) saveActivity();
+});
+document.addEventListener('paste', onBoardPaste);
+// Esc closes the card, so you are never stuck inside it, and closing SAVES. The activity
+// editor sits on top of the card, so it has to be the one that closes first.
+document.addEventListener('keydown', function(e){
+  if (e.key !== 'Escape') return;
+  // The date prompt is a question, not an editor: Esc there means "never mind".
+  const d = document.getElementById('dateModalBg');
+  if (d && d.classList.contains('open')) { closeTripDate(); return; }
+  const a = document.getElementById('actModalBg');
+  if (a && a.classList.contains('open')) { saveActivity(); return; }
+  const m = document.getElementById('tripModalBg');
+  if (m && m.classList.contains('open')) closeTripModalSaving();
+});
+
+// ── Cloud sync (Supabase) ──
+// Same project and login as the Tracker, but its own row: table `trip_state`
+// (+ `trip_snapshots` for history). SQL in SETUP.md. Without the tables the app
+// still works, local-only, and says so.
+const SUPABASE_URL = '';   // add your own to turn on accounts + cloud sync
+const SUPABASE_KEY = '';   // see SETUP.md
+// No keys -> demo mode: no login, everything stays in this browser.
+const DEMO_MODE = !SUPABASE_URL || !SUPABASE_KEY;
+const sb = DEMO_MODE ? null : window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+let pushTimer = null;
+let cloudUpdatedAt = null;   // updated_at we last saw, for conflict awareness
+let lastSnapshotTs = 0;      // throttle checkpoint snapshots
+
+function setSync(text) { const el = document.getElementById('syncBadge'); if (el) el.textContent = text; }
+function renderAll() { buildTripList(); }
+
+// Versioned history: a timestamped copy of the whole board, keeping the 50 most recent.
+async function snapshotNow() {
+  if (!currentUser) return;
+  try {
+    await sb.from('trip_snapshots').insert({ user_id: currentUser.id, data: { seed: SEED, trips, nextTripId } });
+    const { data: extra } = await sb.from('trip_snapshots').select('id').eq('user_id', currentUser.id).order('created_at', { ascending: false }).range(50, 500);
+    if (extra && extra.length) await sb.from('trip_snapshots').delete().in('id', extra.map(r => r.id));
+  } catch (e) { /* snapshots table not set up yet - ignore */ }
+}
+function maybeSnapshot() {
+  const now = Date.now();
+  if (now - lastSnapshotTs > 120000) { lastSnapshotTs = now; snapshotNow(); }  // checkpoint at most every 2 min
+}
+
+async function pushToCloudNow() {
+  if (!currentUser) return;
+  const payload = { seed: SEED, trips, nextTripId };
+  setSync('Saving...');
+  let conflict = false;
+  try {   // did another device write since we last synced? if so, snapshot the current cloud so nothing is lost
+    const { data: cur } = await sb.from('trip_state').select('updated_at').eq('user_id', currentUser.id).maybeSingle();
+    if (cur && cur.updated_at && cloudUpdatedAt && cur.updated_at > cloudUpdatedAt) { conflict = true; await snapshotNow(); }
+  } catch (e) {}
+  const nowIso = new Date().toISOString();
+  const { error } = await sb.from('trip_state').upsert({ user_id: currentUser.id, data: payload, updated_at: nowIso });
+  if (error) { setSync('Offline'); return; }
+  cloudUpdatedAt = nowIso;
+  setSync(conflict ? 'Merged' : 'Synced');
+  maybeSnapshot();
+}
+function schedulePush() {
+  if (!currentUser) return;
+  clearTimeout(pushTimer);
+  setSync('Saving...');
+  pushTimer = setTimeout(() => pushToCloudNow().catch(() => setSync('Offline')), 2000);
+}
+
+async function loadFromCloud() {
+  try {
+    const { data, error } = await sb.from('trip_state').select('data, updated_at').eq('user_id', currentUser.id).maybeSingle();
+    if (error) throw error;
+    if (data && data.data && Array.isArray(data.data.trips) && data.data.trips.length) {
+      cloudUpdatedAt = data.updated_at || null;
+      localStorage.setItem(LS_STATE, JSON.stringify(data.data)); // cloud -> local cache
+      loadState();             // reuse the normalize logic
+      setSync('Synced');
+      lastSnapshotTs = Date.now(); snapshotNow();
+    } else {
+      loadState();             // first login: take this device's data (or seed)...
+      await pushToCloudNow();  // ...and push it up
+    }
+  } catch (e) {
+    loadState();               // offline / table missing: fall back to the local cache
+    setSync('Offline');
+    toast('Cloud not reachable - working on this device only');
+  }
+}
+
+
+// ── Cloud history: pick and restore an earlier version ──
+async function openHistory(ev) {
+  ev.stopPropagation();
+  if (!currentUser) { alert('Log in to use cloud history.'); return; }
+  try {
+    const { data, error } = await sb.from('trip_snapshots').select('id, created_at').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(50);
+    if (error) throw error;
+    if (!data || !data.length) { toast('No cloud history yet - it builds up as you edit'); return; }
+    openMenu(ev, data.map(r => ({ val: r.id, label: new Date(r.created_at).toLocaleString() })), id => restoreSnapshot(id));
+  } catch (e) { alert('Cloud history is not set up yet. Run the trip_snapshots SQL in Supabase (see SETUP.md).'); }
+}
+async function restoreSnapshot(id) {
+  try {
+    const { data, error } = await sb.from('trip_snapshots').select('data').eq('id', id).maybeSingle();
+    if (error || !data || !data.data) { alert('Could not load that snapshot.'); return; }
+    const d = data.data;
+    if (!Array.isArray(d.trips)) { alert('That snapshot looks incomplete.'); return; }
+    if (!confirm('Restore this version (' + d.trips.length + ' trips)?\nYour current board is snapshotted first, so this is reversible.')) return;
+    await snapshotNow();
+    localStorage.setItem(LS_STATE, JSON.stringify({ seed: d.seed || SEED, trips: d.trips, nextTripId: d.nextTripId }));
+    loadState(); renderAll(); await pushToCloudNow();
+    toast('Restored earlier version');
+  } catch (e) { alert('Restore failed.'); }
+}
+
+async function startApp() {
+  document.getElementById('authOverlay').style.display = 'none';
+  await loadFromCloud();
+  renderAll();
+}
+// Local-only escape hatch: use the board without an account (no cross-device sync).
+function useLocalOnly() {
+  document.getElementById('authOverlay').style.display = 'none';
+  loadState();
+  renderAll();
+  setSync('Local');
+}
+
+function authError(m) { document.getElementById('authError').textContent = m || ''; }
+async function doLogin() {
+  authError('');
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-pass').value;
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { authError(error.message); return; }
+  currentUser = data.user;
+  await startApp();
+}
+async function doSignup() {
+  authError('');
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-pass').value;
+  const { data, error } = await sb.auth.signUp({ email, password });
+  if (error) { authError(error.message); return; }
+  if (data.session) { currentUser = data.user; await startApp(); }
+  else { authError('Account created - now click Log in.'); }
+}
+async function signOut() { if (sb) { try { await sb.auth.signOut(); } catch (e) {} } location.reload(); }
+
+// Enter key submits the login form
+document.getElementById('auth-pass').addEventListener('keydown', function(e){ if (e.key === 'Enter') doLogin(); });
+
+// ── Init ──
+(async () => {
+  if (DEMO_MODE) {                 // no keys: skip the login wall, run on localStorage
+    document.getElementById('authOverlay').style.display = 'none';
+    loadState(); renderAll();
+    return;
+  }
+  const { data } = await sb.auth.getSession();
+  if (data.session) { currentUser = data.session.user; await startApp(); }
+})();
+</script>
+</body>
+</html>
