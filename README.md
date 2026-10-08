@@ -22,22 +22,39 @@ change stays in your own browser.
   (red once you are over). Hover a card for the first stops of its plan.
 - **Paste to create**: paste trip details anywhere on the page and a new card opens already filled in.
 
-## A trip, day by day
+## A trip, a week at a time
 
-![a trip card with its day plan](docs/screenshot-trip.png)
+![a trip card with its week calendar](docs/screenshot-trip.png)
 
-Open a card and the plan is laid out as **one column per day**:
+Open a card and the plan is a **calendar**: seven days side by side, 07:00 to 02:00, and a whole
+day fits in the window without scrolling. The arrows move a week at a time.
 
-- **Activities** are dragged onto the day you will do them. Each one carries where it is (a click
-  opens it in Google Maps), how long it takes, and the drive to get there.
-- **Every day adds itself up**: hours doing, hours driving, so an overloaded day is obvious before
-  you are living it.
-- **Bookings**: anything that needs a ticket is marked *to book* until you tick it and add the
-  reference. The header counts what is still open.
-- **Where you sleep**, night by night, at the bottom of each day. Three nights in the same place is
-  one booking, not three copies of it.
-- **Preparation**: a checklist you tick as things get done. **Links**: every useful page, described.
-- **Share**: the whole trip as one printable page, or text to paste into an email.
+- **Every stop sits at its time**, as tall as it lasts. Set a start time, or leave it empty and it
+  follows the stop before it.
+- **The way there is drawn in front of each stop**: a dashed block with the mode (car, train, metro,
+  flight, walk...), how long it takes, and the route when you hover it.
+- **Activities to place**: a pool of ideas above the calendar. Drag one onto a day and a line shows
+  the exact time it will land on; drag stops between days, or back to the pool.
+- **Hover anything** for the full detail, **click** to change it. Each day's header says where you
+  sleep that night.
+- **Colour means one thing**: grey unless it is about a booking. Red is still to book, green is booked.
+- **Timeline** and **Board** views are one click away for a different read of the same plan.
+
+## Bookings, one by one
+
+![the bookings tab](docs/screenshot-bookings.png)
+
+A tab for everything that has to be paid for before you go:
+
+- **How many are left**, how many days before you leave, and a progress bar.
+- **Ticket cards** for every activity marked "has to be reserved", stamped *To book* or *Booked*.
+- **Beds, night by night**: one cell per night. Three nights in the same place is one booking, not three.
+- **Book them one by one**: opens the first open booking, and **Booked, next** saves it and moves to
+  the next. The confirmation number, the booking page and the document itself live on each one.
+
+Also on the card: **Preparation** (the photo and description, who is coming, budget, a checklist)
+and **Links** (every useful page, described). **Share** turns the trip into one printable page, or
+text to paste into an email.
 
 ---
 

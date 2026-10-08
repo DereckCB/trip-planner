@@ -10,11 +10,13 @@
     --bg: #111214; --surface: #18191c; --surface2: #1f2023;
     --border: #2a2b2e; --accent: #5b6370;
     --green: #4a7c59; --text: #d1d3d8; --muted: #565a61; --white: #e8eaed;
+    --red: #d0614f;
   }
   :root[data-theme="light"] {
     --bg: #f6f7f9; --surface: #ffffff; --surface2: #eceff3;
     --border: #d7dbe1; --accent: #6b7480;
     --green: #3f8a5b; --text: #23272e; --muted: #7b828c; --white: #10131a;
+    --red: #c0443a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
@@ -447,11 +449,11 @@
   .pk-sleep.none { border-style: dashed; }
   .pk-sleep.none .pk-where { color: var(--muted); font-style: italic; font-weight: 500; }
   .pk-sleep.ok   { border-style: solid; border-color: color-mix(in srgb, var(--green) 55%, var(--border)); }
-  .pk-sleep.todo { border-style: solid; border-color: color-mix(in srgb, #c79a4a 55%, var(--border)); }
+  .pk-sleep.todo { border-style: solid; border-color: color-mix(in srgb, var(--red) 65%, var(--border)); }
   .pk-sleep .pk-bk { flex-shrink: 0; border: none; background: none; cursor: pointer;
                      font-size: 11px; font-weight: 800; line-height: 1; padding: 1px 2px; }
   .pk-sleep.ok   .pk-bk { color: var(--green); }
-  .pk-sleep.todo .pk-bk { color: #c79a4a; }
+  .pk-sleep.todo .pk-bk { color: var(--red); }
   
   .act-sum { margin-top: 8px; font-size: 10.5px; color: var(--muted); min-height: 14px; }
   .act-sum.bad { color: #c0704f; }
@@ -472,7 +474,7 @@
                border-radius: 999px; text-transform: none; letter-spacing: 0; }
   .beds-chip:empty { display: none; }
   .beds-chip.ok   { color: var(--green); background: color-mix(in srgb, var(--green) 15%, transparent); }
-  .beds-chip.warn { color: #c79a4a; background: color-mix(in srgb, #c79a4a 15%, transparent); }
+  .beds-chip.warn { color: var(--red); background: color-mix(in srgb, var(--red) 15%, transparent); }
   .pk-empty { font-size: 10.5px; color: var(--muted); font-style: italic; padding: 3px 1px; }
   
   .pk-tip { position: fixed; z-index: 220; width: 268px; max-width: calc(100vw - 20px);
@@ -484,6 +486,198 @@
   .pk-tip .pt-meta b { color: var(--text); font-weight: 700; }
   .pk-tip .pt-desc { margin-top: 7px; font-size: 11.5px; color: var(--text); line-height: 1.45; white-space: pre-wrap; }
   .pk-tip .pt-hint { margin-top: 7px; font-size: 10px; color: var(--muted); font-style: italic; }
+  .pk-tip .pt-leg { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 1px 6px; margin-top: 6px; font-size: 11px; color: var(--text); line-height: 1.4; }
+  .pk-tip .pt-leg .pt-ic { font-size: 14px; line-height: 1.2; }
+  .pk-tip .pt-leg .pt-m { color: var(--muted); }
+  .pk-tip .pt-need { color: var(--red); font-weight: 800; }
+  .pk-tip .pt-ok { color: var(--green); font-weight: 800; }
+  
+  .cal-pool { margin-bottom: 7px; }
+  .cal-pool.empty { padding-top: 5px; padding-bottom: 5px; }
+  .cal-pool.empty .pk-head { margin-bottom: 0; }
+  .cal-pool .pk-hint, .pk-backlog .pk-hint { text-transform: none; letter-spacing: 0; font-weight: 500; font-style: italic; opacity: .8; }
+  .cal-pc { display: grid; gap: 1px; max-width: 240px; padding: 5px 9px; border: 1px solid var(--border); border-radius: 7px;
+            background: var(--surface2); cursor: grab; min-width: 0; }
+  .cal-pc b { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cal-pc small { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cal-pc.need { border-color: var(--red); background: color-mix(in srgb, var(--red) 10%, var(--surface)); }
+  .cal-pc.ok { border-color: var(--green); background: color-mix(in srgb, var(--green) 10%, var(--surface)); }
+  .cal-pc.dragging { opacity: .4; }
+  .cal-pc.just-added, .cal-ev.just-added { animation: pk-land 1.5s ease-out; }
+  .cal-bar { flex-shrink: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-bottom: 6px; }
+  .cal-nav { width: 30px; height: 26px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+             border-radius: 6px; font-size: 15px; line-height: 1; cursor: pointer; }
+  .cal-nav:hover:not(:disabled) { border-color: var(--muted); }
+  .cal-nav:disabled { opacity: .35; cursor: default; }
+  .cal-range { font-size: 12.5px; font-weight: 700; color: var(--text); min-width: 120px; }
+  .cal-strip { display: flex; flex-wrap: wrap; gap: 3px; }
+  .cal-strip button { position: relative; min-width: 24px; padding: 1px 0; border: 1px solid var(--border); background: none;
+                      color: var(--muted); border-radius: 5px; font: 700 10.5px inherit; font-family: inherit; cursor: pointer; }
+  .cal-strip button.in { background: var(--surface2); color: var(--text); border-color: var(--muted); }
+  .cal-strip button.need::after { content: ''; position: absolute; top: -3px; right: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
+  .cal-wrap { flex: 1; min-height: 0; display: flex; overflow-x: auto; }
+  .cal { flex: 1; min-width: 720px; min-height: 380px; display: grid; grid-template-rows: auto minmax(0, 1fr);
+         grid-template-columns: 34px repeat(var(--n), minmax(0, 1fr)); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .cal-dh { min-width: 0; padding: 5px 6px; border-left: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .cal-dh:first-child { border-left: none; }
+  .cal-dh b { display: block; font-size: 11.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cal-bed { display: block; width: 100%; margin-top: 2px; padding: 0; border: none; background: none; text-align: left; font-family: inherit;
+             font-size: 10.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .cal-bed.need { color: var(--red); } .cal-bed.ok { color: var(--green); }
+  .cal-bed.none { color: var(--muted); font-weight: 500; cursor: default; }
+  .cal-hours { position: relative; }
+  .cal-hours span { position: absolute; right: 4px; font-size: 9.5px; color: var(--muted); transform: translateY(-50%); font-variant-numeric: tabular-nums; }
+  .cal-col { position: relative; min-width: 0; border-left: 1px solid var(--border);
+             background-image: linear-gradient(color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px); background-size: 100% calc(100% / 19); }
+  .cal-col.drop-on { background-color: color-mix(in srgb, var(--muted) 10%, transparent); }
+  .cal-col:hover .cal-add { opacity: 1; }
+  .cal-add { position: absolute; right: 2px; bottom: 2px; z-index: 2; }
+  .cal-drop { position: absolute; left: 0; right: 0; border-top: 2px solid var(--text); pointer-events: none; z-index: 5; }
+  .cal-drop span { position: absolute; left: 2px; top: -9px; font-size: 10px; font-weight: 700; background: var(--text); color: var(--bg);
+                   padding: 0 4px; border-radius: 3px; font-variant-numeric: tabular-nums; }
+  .cal-ev { position: absolute; left: 2px; right: 2px; overflow: hidden; padding: 1px 5px; border-radius: 5px; cursor: grab;
+            background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 10.5px; line-height: 1.25; }
+  .cal-ev:hover { border-color: var(--muted); z-index: 3; }
+  .cal-ev b { font-weight: 700; }
+  .cal-ev .t { margin-left: 3px; color: var(--muted); font-size: 9.5px; font-variant-numeric: tabular-nums; }
+  .cal-ev.need { background: color-mix(in srgb, var(--red) 12%, var(--surface)); border-color: var(--red); }
+  .cal-ev.ok { background: color-mix(in srgb, var(--green) 12%, var(--surface)); border-color: var(--green); }
+  .cal-ev.dragging { opacity: .4; }
+  
+  .cal-leg { display: flex; align-items: center; gap: 4px; background: transparent; border: 1px dashed var(--muted); color: var(--muted); }
+  .cal-leg .ic { flex: none; font-size: 11px; line-height: 1; }
+  .cal-leg .lt { flex: none; font-weight: 700; color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .cal-leg .lm { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cal-leg.need { border: 1px dashed var(--red); background: color-mix(in srgb, var(--red) 10%, transparent); }
+  .cal-leg.ok { border: 1px dashed var(--green); background: color-mix(in srgb, var(--green) 10%, transparent); }
+
+  
+  #tpane-book.on { flex-direction: column; }
+  .bk-pane { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 2px 6px; }
+  .bk-empty { color: var(--muted); font-size: 13px; padding: 20px 0; }
+  .bk-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+  .bk-big { font-size: 42px; font-weight: 800; line-height: 1; color: var(--red); }
+  .bk-big.ok { color: var(--green); }
+  .bk-head p { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
+  .bk-prog { flex: 1; min-width: 220px; max-width: 420px; display: grid; justify-items: end; gap: 5px; }
+  .bk-bar { width: 100%; height: 9px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--red) 22%, transparent); display: flex; }
+  .bk-bar i { background: var(--green); transition: width .3s; }
+  .bk-prog span { font-size: 11.5px; color: var(--muted); }
+  .bk-run { margin-top: 2px; }
+  .bk-sec { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 18px 0 8px; font-size: 11px; font-weight: 800;
+            text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+  .bk-n { text-transform: none; letter-spacing: 0; font-weight: 600; }
+  .bk-filter { display: inline-flex; gap: 4px; text-transform: none; letter-spacing: 0; }
+  .bk-filter button { border: 1px solid var(--border); background: none; color: var(--muted); border-radius: 999px; padding: 1px 9px;
+                      font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .bk-filter button.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .bk-tickets { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 9px; }
+  .bk-tk { display: grid; grid-template-columns: minmax(0, 1fr) 84px; padding: 0; overflow: hidden; text-align: left; cursor: pointer;
+           background: var(--surface); border: 1px solid var(--border); border-radius: 9px; font-family: inherit; color: var(--text); }
+  .bk-tk:hover { border-color: var(--muted); }
+  .bk-tk-main { display: grid; gap: 1px; padding: 9px 11px; min-width: 0; }
+  .bk-tk-main b { font-size: 13px; line-height: 1.3; }
+  .bk-tk-main small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bk-stub { display: grid; place-items: center; padding: 6px; border-left: 2px dashed var(--border); font-size: 11.5px; font-weight: 800; text-align: center; }
+  .bk-tk.need .bk-stub { color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
+  .bk-tk.ok .bk-stub { color: var(--green); background: color-mix(in srgb, var(--green) 12%, transparent); }
+  .bk-nights-wrap { overflow-x: auto; padding-bottom: 4px; }
+  .bk-nights { display: grid; grid-template-columns: repeat(var(--nn), minmax(58px, 1fr)); gap: 4px; }
+  .bk-nt { display: grid; gap: 1px; padding: 6px 3px; text-align: center; border-radius: 7px; cursor: pointer; font-family: inherit;
+           color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); border: 1px solid transparent; }
+  .bk-nt.ok { color: var(--green); background: color-mix(in srgb, var(--green) 12%, transparent); }
+  .bk-nt:hover { border-color: currentColor; }
+  .bk-nt.starts { box-shadow: -3px 0 0 var(--surface), -4px 0 0 var(--border); }
+  .bk-nt b { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bk-nt span { font-size: 10px; color: var(--text); opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bk-nt small { font-size: 9.5px; font-weight: 700; }
+  .tm-tab .tb-book.need { color: var(--red); opacity: 1; }
+  .tm-tab .tb-book.ok { color: var(--green); opacity: 1; }
+  .btn.bk-next { background: var(--green); border-color: var(--green); color: #fff; }
+  .btn.bk-next[hidden] { display: none; }
+  @media (prefers-reduced-motion: reduce) { .bk-bar i { transition: none; } }
+  
+  .pv-toggle { display: inline-flex; flex-shrink: 0; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+  .pv-toggle button { background: none; border: none; color: var(--muted); font-family: inherit; font-size: 11px;
+                      font-weight: 700; padding: 4px 9px; cursor: pointer; }
+  .pv-toggle button.on { background: var(--surface2); color: var(--white); }
+  .tl-legend { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 10.5px; color: var(--muted); margin: -2px 0 7px; }
+  .tl-legend .r { color: var(--red); font-weight: 800; } .tl-legend .g { color: var(--green); font-weight: 800; }
+  
+  .tl-days { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
+  .tl-days button { --kc: var(--muted); position: relative; min-width: 30px; font-family: inherit; font-size: 10.5px; font-weight: 800;
+                    color: var(--kc); background: color-mix(in srgb, var(--kc) 10%, transparent);
+                    border: 1px solid color-mix(in srgb, var(--kc) 40%, var(--border)); border-radius: 6px; padding: 2px 6px; cursor: pointer; }
+  .tl-days button:hover { background: color-mix(in srgb, var(--kc) 24%, transparent); }
+  .tl-days button.need::after { content: ''; position: absolute; top: -3px; right: -3px; width: 7px; height: 7px;
+                                border-radius: 50%; background: var(--red); border: 1px solid var(--surface); }
+  .tl-days button.today { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .tl-days button.empty { opacity: .5; }
+  .tl-lanes { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 2px; }
+  .tl-lanes::-webkit-scrollbar { width: 6px; }
+  .tl-lanes::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .tl-lane { flex-shrink: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "lbl side" "track track";
+             gap: 7px 10px; align-items: center;
+             border: 1px solid var(--border); border-left: 4px solid var(--kc); border-radius: 9px; padding: 8px 10px 9px;
+             background: color-mix(in srgb, var(--kc) 4%, var(--surface)); }
+  .tl-lane[data-today] { box-shadow: 0 0 0 1px var(--accent); }
+  .tl-lane.drop-on { border-color: var(--kc); background: color-mix(in srgb, var(--kc) 16%, var(--surface)); }
+  .tl-lane:hover .pk-add { opacity: 1; }
+  .tl-lbl { grid-area: lbl; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0;
+            font-size: 11px; color: var(--muted); line-height: 1.35; }
+  .tl-lbl .tl-n { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 800;
+                  text-transform: uppercase; letter-spacing: .04em; color: var(--kc); }
+  .tl-lbl .tl-date { font-weight: 700; color: var(--text); }
+  .tl-lbl .tl-today { font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); }
+  .tl-lbl .tl-where { min-width: 0; color: var(--text); opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46ch; }
+  .tl-lbl .tl-load { font-weight: 700; color: var(--text); cursor: help; }
+  .tl-lbl .tl-split { font-size: 10.5px; }
+  .tl-track { grid-area: track; display: flex; flex-wrap: wrap; align-items: stretch; row-gap: 8px; min-width: 0; min-height: 40px; }
+  .tl-stop { display: flex; align-items: stretch; min-width: 0; max-width: 100%; }
+  .tl-gap { flex: none; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 54px; margin: 0 4px; cursor: help; }
+  .tl-stop:first-child .tl-gap { margin-left: 0; }
+  .tl-gap .tl-pill { align-self: center; display: flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700;
+                     color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+                     padding: 1px 7px; white-space: nowrap; }
+  .tl-gap:hover .tl-pill { border-color: var(--accent); }
+  .tl-gap .tl-line { border-bottom: 2px dashed var(--border); }
+  .tl-gap.walk .tl-line { border-bottom-style: dotted; }
+  .tl-gap.drop-here .tl-line { border-bottom-color: var(--green); }
+  .tl-stop:not(:first-child) > .tl-card:first-child { margin-left: 8px; }
+  .tl-card { flex: none; position: relative; display: flex; flex-direction: column; gap: 3px; min-width: 0; max-width: 100%;
+             background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--green);
+             border-radius: 7px; padding: 6px 18px 6px 9px; cursor: grab; }
+  .tl-card.need { border-left-color: var(--red); background: color-mix(in srgb, var(--red) 8%, var(--surface)); }
+  .tl-card:hover { border-color: var(--green); }
+  .tl-card.need:hover { border-color: var(--red); }
+  .tl-card.dragging { opacity: .45; }
+  .tl-card.drop-here { box-shadow: -4px 0 0 var(--green); }
+  .tl-card.just-added { animation: pk-land 1.5s ease-out; }
+  .tl-card .tl-t { font-size: 12px; font-weight: 700; color: var(--text); line-height: 1.3;
+                   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .tl-card .tl-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; margin-top: auto; font-size: 10px; color: var(--muted); }
+  .tl-card .tl-place { display: block; min-width: 0; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tl-card .pk-map.tl-place { text-decoration: none; }
+  .tl-card .pk-map.tl-place:hover { color: var(--text); text-decoration: underline; }
+  .tl-card .tl-nobook { font-size: 9.5px; color: var(--muted); opacity: .75; }
+  .tl-card .pk-x { position: absolute; top: 3px; right: 3px; opacity: 0; background: none; border: none;
+                   color: var(--muted); font-size: 11px; cursor: pointer; padding: 1px 3px; line-height: 1; }
+  .tl-card:hover .pk-x { opacity: 1; }
+  .tl-card .pk-x:hover { color: var(--text); }
+  .pk-backlog .tl-card { width: 210px; }
+  .pk-backlog.empty { padding-top: 5px; padding-bottom: 5px; }
+  .pk-backlog.empty .pk-head { margin-bottom: 0; }
+  .pk-backlog.empty .pk-head .pk-count { display: none; }
+  .pk-backlog.empty .pk-hint { text-transform: none; letter-spacing: 0; font-weight: 500; font-style: italic; opacity: .8; }
+  .tl-side { grid-area: side; min-width: 0; max-width: 260px; }
+  .tl-side .pk-sleep { margin-top: 0; }
+  .tl-home { font-size: 10.5px; color: var(--muted); }
+  @media (max-width: 760px) {
+    .tl-lane { grid-template-columns: minmax(0, 1fr); grid-template-areas: "lbl" "side" "track"; }
+    .tl-side { max-width: none; }
+    .tl-stop, .tl-card { width: 100%; }
+    .tl-stop .tl-card { flex: 1; width: auto !important; }
+  }
   
   #actModalBg .modal { width: min(460px, calc(100vw - 32px)); }
   #actModalBg { z-index: 210; }
@@ -561,7 +755,8 @@
   
   .sv-frozen #s-files .fz-x { display: none; }
   
-  .pk-resv { color: #c79a4a; background: color-mix(in srgb, #c79a4a 16%, transparent); }
+  .pk-resv { color: var(--red); background: color-mix(in srgb, var(--red) 16%, transparent); }
+  .pk-none { color: var(--green); background: color-mix(in srgb, var(--green) 11%, transparent); font-weight: 600; }
   .pk-resv.ok { color: var(--green); background: color-mix(in srgb, var(--green) 16%, transparent); }
   .pk-sleep .pk-mark { flex-shrink: 0; font-size: 9px; opacity: .8; font-weight: 700; }
   
@@ -717,6 +912,9 @@
     body { font-size: 11px; }
     .app-title { font-size: 15px; }
   }
+  .demo-note { background: color-mix(in srgb, #c79a4a 14%, var(--surface)); border: 1px solid color-mix(in srgb, #c79a4a 34%, var(--border)); color: var(--text); border-radius: 10px; padding: 10px 13px; font-size: 12px; line-height: 1.5; margin-bottom: 16px; }
+  .demo-note b { color: var(--white); }
+  .demo-note a { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -850,7 +1048,8 @@
     </div>
 
     <div class="tm-tabs">
-      <button type="button" class="tm-tab on" id="ttab-summary" onclick="showTripTab('summary')">Summary</button>
+      <button type="button" class="tm-tab on" id="ttab-summary" onclick="showTripTab('summary')">Plan</button>
+      <button type="button" class="tm-tab" id="ttab-book" onclick="showTripTab('book')">Bookings<span class="tb-n tb-book" id="ttab-book-n"></span></button>
       <button type="button" class="tm-tab" id="ttab-prep" onclick="showTripTab('prep')">Preparation<span class="tb-n" id="ttab-prep-n"></span></button>
       <button type="button" class="tm-tab" id="ttab-links" onclick="showTripTab('links')">Links<span class="tb-n" id="ttab-links-n"></span></button>
     </div>
@@ -858,7 +1057,30 @@
     <div class="tm-body">
 
             <div class="tm-pane on" id="tpane-summary">
-        <div class="jm-section">
+        <div class="jm-section plan-wrap">
+          <div class="pk-bar">
+            <div class="jm-sec-title" style="margin:0">🗺️ Plan <span class="jm-hint">- drag an activity onto the day you will do it</span><span id="p-beds" class="beds-chip"></span></div>
+            <div class="pv-toggle" id="p-planview" role="group" aria-label="Plan layout">
+              <button type="button" data-pv="calendar" onclick="setPlanView('calendar')" title="A week at a time, each day by the clock">Calendar</button>
+              <button type="button" data-pv="timeline" onclick="setPlanView('timeline')" title="One row per day, the travel between stops shown as gaps">Timeline</button>
+              <button type="button" data-pv="board" onclick="setPlanView('board')" title="One column per day">Board</button>
+            </div>
+            <div class="ti-add">
+              <input type="text" id="p-newidea" placeholder="Add an activity: Sacred Valley tour, the market…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPlanIdea();}">
+              <button type="button" class="jm-addbtn" onclick="addPlanIdea()">+ Add</button>
+            </div>
+          </div>
+          <div id="p-plan" class="plan-wrap" style="min-height:0"></div>
+        </div>
+      </div>
+
+            <div class="tm-pane" id="tpane-book">
+        <div id="p-bookings" class="bk-pane"></div>
+      </div>
+
+            <div class="tm-pane" id="tpane-prep">
+        <div class="tm-col">
+          <div class="jm-section">
           <div class="jm-sec-title">🖼️ The card <span class="jm-hint">- the photo and the line you read when you hover it</span></div>
           <div class="photo-box">
             <div class="photo-prev" id="p-photoprev" title="Drop an image here, or use Upload">No photo yet</div>
@@ -874,20 +1096,6 @@
           </div>
         </div>
 
-        <div class="jm-section plan-wrap">
-          <div class="pk-bar">
-            <div class="jm-sec-title" style="margin:0">🗺️ Plan <span class="jm-hint">- drag an activity onto the day you will do it</span><span id="p-beds" class="beds-chip"></span></div>
-            <div class="ti-add">
-              <input type="text" id="p-newidea" placeholder="Add an activity: Sacred Valley tour, the market…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPlanIdea();}">
-              <button type="button" class="jm-addbtn" onclick="addPlanIdea()">+ Add</button>
-            </div>
-          </div>
-          <div id="p-plan" class="plan-wrap" style="min-height:0"></div>
-        </div>
-      </div>
-
-            <div class="tm-pane" id="tpane-prep">
-        <div class="tm-col">
           <div class="jm-section">
             <div class="jm-sec-title">🧰 Preparation <span class="jm-hint">- who, how you get there, what it costs</span></div>
             <label>Who is coming</label>
@@ -966,6 +1174,11 @@
       <div><label>How long it takes</label><input id="a-dur" placeholder="2h, half day, 45 min" oninput="refreshActSum()"></div>
     </div>
     <div class="act-sum" id="a-sum"></div>
+    <div class="act-grid three" style="margin-top:10px">
+      <div><label>Starts at <span class="jm-hint">- empty follows the stop before</span></label><input id="a-at" placeholder="09:30"></div>
+      <div><label>Getting here by</label><select id="a-mode"></select></div>
+      <div><label>How to get here</label><input id="a-how" placeholder="Bus 434 from the station, ferry at 9h…"></div>
+    </div>
 
     <label style="margin-top:10px">Map <span class="jm-hint">- paste a Google Maps link, or leave it and the place name is searched</span></label>
     <div class="mp-row">
@@ -1007,6 +1220,7 @@
       <button class="btn secondary" onclick="deleteActivity()" title="Remove this activity">Delete</button>
       <button class="btn secondary" onclick="closeActivity()"
               title="Close and throw away the changes. Clicking outside or pressing Esc keeps them.">Discard</button>
+      <button class="btn bk-next" id="a-booknext" hidden onclick="bookedNext('act')" title="Mark it booked, save, and open the next thing to book">✓ Booked, next</button>
       <button class="btn" onclick="saveActivity()">Done</button>
     </div>
   </div>
@@ -1039,6 +1253,7 @@
       <button class="btn secondary" id="s-clear" onclick="clearSleep()" title="Forget this night entirely">Clear</button>
       <button class="btn secondary" onclick="closeSleep()"
               title="Close and throw away the changes.">Discard</button>
+      <button class="btn bk-next" id="s-booknext" hidden onclick="bookedNext('night')" title="Mark it booked, save, and open the next thing to book">✓ Booked, next</button>
       <button class="btn" onclick="saveSleep()">Done</button>
     </div>
   </div>
@@ -1398,6 +1613,10 @@ function normalizeTrips() {
 
         const extra = { place: String(x && x.place || ''), dur: String(x && x.dur || ''),
                         travel: String(x && x.travel || ''), desc: String(x && x.desc || ''),
+
+                        mode: planMode(x && x.mode), how: String(x && x.how || ''),
+
+                        at: planAt(x && x.at),
                         map: mapLink(x && x.map),
                         resv: !!(x && x.resv), resvDone: !!(x && x.resvDone),
                         resvRef: String(x && x.resvRef || ''), resvUrl: String(x && x.resvUrl || ''),
@@ -1416,7 +1635,7 @@ function normalizeTrips() {
       String(t.ideas).split(/\r?\n/).map(l => l.replace(/^\s*[-*•]\s*/, '').trim()).filter(Boolean)
 
         .forEach(l => t.itinerary.push({ what: l, day: null, place: '', dur: '', travel: '', desc: '',
-                                         map: '', resv: false, resvDone: false, resvRef: '', resvUrl: '', files: [] }));
+                                         mode: '', how: '', at: '', map: '', resv: false, resvDone: false, resvRef: '', resvUrl: '', files: [] }));
       t.ideas = '';
     }
     normalizeLodging(t);
@@ -1460,9 +1679,16 @@ function loadState() {
   healTrip503Dates();
   healTrip503Chic();
   healTrip515Onward();
+  healTrip514Tickets();
+  healTrip515Flight();
   healTrip516Coast();
   healTrip513Musts();
   healTrip513Flights();
+  healTrip513Terminal();
+  healTrip513Guide();
+  healTrip513Split();
+  healTripModes();
+  healTripTimes();
   healTripLinks();
 
   normalizeTrips();
@@ -1497,18 +1723,49 @@ const TRIP_D_RETIRED_PLAN = [];
 const TRIP_D_RETIRED_ITEMS = [];
 const TRIP_D_RETIRED_LINKS = [];
 function healTrip516Coast() {  }
-const LS_PORTUGAL_HEAL = 'trips_heal_7';
-const PORTUGAL_HEAL = 'heal-v8';
-const PORTUGAL_RETIRED_PLAN = [];
-const PORTUGAL_RETIRED_ITEMS = [];
-const PORTUGAL_RETIRED_LINKS = [];
+const LS_TRIP_G_HEAL = 'trips_heal_7';
+const TRIP_G_HEAL = 'heal-v8';
+const TRIP_G_RETIRED_PLAN = [];
+const TRIP_G_RETIRED_ITEMS = [];
+const TRIP_G_RETIRED_LINKS = [];
 function healTrip513Musts() {  }
-const LS_PORTUGAL_FLIGHTS = 'trips_portugal_flights';
-const PORTUGAL_FLIGHTS = 'transat-p2zlo6-v1';
-const PORTUGAL_FLIGHTS_RETIRED_PLAN = [];
-const PORTUGAL_FLIGHTS_RETIRED_ITEMS = [];
-const PORTUGAL_FLIGHTS_RETIRED_LINKS = [];
+const LS_TRIP_G_FLIGHTS = 'trips_heal_27';
+const TRIP_G_FLIGHTS = 'v1';
+const TRIP_G_FLIGHTS_RETIRED_PLAN = [];
+const TRIP_G_FLIGHTS_RETIRED_ITEMS = [];
+const TRIP_G_FLIGHTS_RETIRED_LINKS = [];
 function healTrip513Flights() {  }
+const LS_TRIP_G_T1 = 'trips_heal_28';
+const TRIP_G_T1 = 'v1';
+function healTrip513Terminal() {  }
+const LS_TRIP_G_GUIDE = 'trips_heal_29';
+const TRIP_G_GUIDE = 'v1';
+const TRIP_G_GUIDE_ADD = [];
+const TRIP_G_GUIDE_STAY = 'v1';
+function healTrip513Guide() {  }
+const LS_TRIP_G_SPLIT = 'trips_heal_30';
+const TRIP_G_SPLIT = 'v1';
+const TRIP_G_SPLIT_RETIRED = [];
+const TRIP_G_SPLIT_SUCCESSOR = {};
+function healTrip513Split() {  }
+const LS_TRIP_E_FLIGHT = 'trips_heal_31';
+const TRIP_E_FLIGHT = 'v1';
+const TRIP_E_FLIGHT_OLD_T = 'v1';
+const TRIP_E_FLIGHT_NEW_T = 'v1';
+function healTrip515Flight() {  }
+const LS_TRIP_H_TICKETS = 'trips_heal_32';
+const TRIP_H_TICKETS = 'v1';
+const TRIP_H_OLD_NOTES = 'v1';
+const TRIP_H_LINES = [];
+function healTrip514Tickets() {  }
+const LS_TRIP_MODES = 'trips_modes_heal';
+const TRIP_MODES = 'pt-cl-modes-v1';
+const TRIP_MODE_LINES = {};
+const LS_TRIP_TIMES = 'trips_cal_times', TRIP_TIMES = 'pt-times-v1';
+const TRIP_TIME_LINES = {};
+const TRIP_PLANE_NIGHTS = {};
+function healTripTimes() {  }
+function healTripModes() {  }
 const LS_TRIP_HEAL = 'trips_heal_9';
 const TRIP_HEAL = 'heal-v10';
 function sameText(a, b) { return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase(); }
@@ -1779,6 +2036,7 @@ function planActivity(x) {
            place: String(x.place || ''), dur: String(x.dur || ''),
            travel: String(x.travel || ''), desc: String(x.desc || ''),
 
+           mode: planMode(x.mode), how: String(x.how || ''), at: planAt(x.at),
            map: mapLink(x.map),
            resv: !!x.resv, resvDone: !!x.resvDone,
            resvRef: String(x.resvRef || ''), resvUrl: String(x.resvUrl || ''),
@@ -2141,7 +2399,8 @@ const SOFT_DUR = {
 };
 
 function durMins(s) {
-  const raw = String(s == null ? '' : s).trim().toLowerCase();
+  const raw = String(s == null ? '' : s).trim().toLowerCase()
+    .replace(/\s+(?:by\s+\w+|on foot|walk(?:ing)?|drive|driving|bus|train|ferry|boat|metro|flight|taxi|bike|cycling)$/, '').trim();
   if (!raw) return null;
   if (Object.prototype.hasOwnProperty.call(SOFT_DUR, raw)) return SOFT_DUR[raw];
 
@@ -2388,7 +2647,440 @@ function planRowHTML(it) {
   </div>`;
 }
 
+const MODES = {
+  car: ['🚗', 'Drive'], taxi: ['🚕', 'Taxi'], bus: ['🚌', 'Bus'], train: ['🚆', 'Train'], metro: ['🚇', 'Metro'],
+  walk: ['🚶', 'Walk'], bike: ['🚲', 'Bike'], boat: ['⛴️', 'Boat'], plane: ['✈️', 'Flight'],
+};
+
+function planAt(v) {
+  const m = String(v == null ? '' : v).trim().toLowerCase().match(/^(\d{1,2})\s*[:h.]?\s*(\d{2})?$/);
+  if (!m) return '';
+  const h = Number(m[1]), mi = Number(m[2] || 0);
+  return h < 24 && mi < 60 ? String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0') : '';
+}
+function planMode(v) { v = String(v || '').trim().toLowerCase(); return /^(car|taxi|bus|train|metro|walk|bike|boat|plane)$/.test(v) ? v : ''; }
+const MODE_WORDS = [
+  ['plane', /\b(fly|flight|flights|plane|airport)\b/], ['boat', /\b(ferry|boat|sail|sailboat|water taxi)\b/],
+  ['train', /\b(train|rail|alfa pendular|tgv|amtrak|via rail)\b/], ['metro', /\b(metro|subway|tram|streetcar)\b/],
+  ['bus', /\b(bus|shuttle|coach|navette)\b/], ['taxi', /\b(taxi|uber|bolt)\b/],
+  ['bike', /\b(bike|cycle|cycling|velo)\b/], ['car', /\b(drive|driving|car|rental)\b/],
+];
+function guessMode(it) {
+  const head = (String(it.what || '') + ' ' + String(it.travel || '')).toLowerCase();
+  for (const [m, re] of MODE_WORDS) if (re.test(head)) return m;
+  if (/\bwalk(ing)?\b|on foot/.test(String(it.travel || '').toLowerCase())) return 'walk';
+  const how = String(it.how || '').toLowerCase();
+  for (const [m, re] of MODE_WORDS) if (re.test(how)) return m;
+  if (/\bwalk|on foot/.test(how)) return 'walk';
+  const tr = String((document.getElementById('p-transport') || {}).value || '').toLowerCase();
+  for (const [m, re] of MODE_WORDS) if (m !== 'plane' && re.test(tr)) return m;
+  return 'car';
+}
+function actMode(it) { return planMode(it.mode) || guessMode(it); }
+function fillModeSelect(it) {
+  const sel = document.getElementById('a-mode'); if (!sel) return;
+  const g = MODES[guessMode(Object.assign({}, it, { mode: '' }))];
+  sel.innerHTML = `<option value="">Auto (${g[0]} ${g[1]})</option>` +
+    Object.keys(MODES).map(k => `<option value="${k}">${MODES[k][0]} ${MODES[k][1]}</option>`).join('');
+  sel.value = planMode(it.mode);
+}
+
+const PLAN_VIEWS = ['calendar', 'timeline', 'board'];
+let planView = 'calendar';
+try { const v = localStorage.getItem('trips_plan_view'); if (PLAN_VIEWS.includes(v)) planView = v; } catch (e) {}
+function setPlanView(v) {
+  planView = PLAN_VIEWS.includes(v) ? v : 'calendar';
+  writeLS('trips_plan_view', planView);
+  renderPlan();
+}
+function refreshPlanToggle() {
+  document.querySelectorAll('#p-planview button').forEach(b => b.classList.toggle('on', b.dataset.pv === planView));
+}
 function renderPlan() {
+  refreshPlanToggle();
+  if (planView === 'board') renderPlanBoard();
+  else if (planView === 'timeline') renderPlanTimeline();
+  else renderPlanCalendar();
+  refreshBookBadge();
+  if (tripTab === 'book') renderBookings();
+}
+const TL_PX = 0.5;
+function tlCardHTML(it, width) {
+  const need = it.resv && !it.resvDone;
+  const sub = [];
+  let place = '';
+  if (String(it.place || '').trim()) {
+    const mu = actMapUrl(it, modalDest());
+    place = (mu
+      ? `<a class="pk-map tl-place" href="${escAttr(mu)}" target="_blank" rel="noopener" draggable="false"
+           title="Open ${escAttr(it.place)} in Google Maps" onclick="event.stopPropagation()">📍 ${escHtml(it.place)}</a>`
+      : `<span class="tl-place">📍 ${escHtml(it.place)}</span>`);
+  }
+  if (String(it.dur || '').trim()) sub.push(`<span class="pk-chip pk-doing">⏱ ${escHtml(it.dur)}</span>`);
+  const nf = (it.files || []).length;
+  sub.push(it.resv
+    ? `<span class="pk-chip pk-resv${it.resvDone ? ' ok' : ''}">🎟 ${it.resvDone ? 'booked' : 'to book'}${nf ? ' 📎' + nf : ''}</span>`
+    : '<span class="tl-nobook">no booking</span>');
+  return `<div class="tl-card${need ? ' need' : ''}${it.id === justAddedId ? ' just-added' : ''}" draggable="true" data-plan="${it.id}"
+       style="${width ? 'width:' + width + 'px' : ''}"
+       ondragstart="planDragStart(event,${it.id})" ondragend="planDragEnd()"
+       ondragover="allowDropOnItem(event)" ondragleave="planDropLeave(event)" ondrop="dropOnPlanItem(event,${it.id})"
+       onclick="openActivity(${it.id})"
+       onmouseenter="showPlanTip(event,${it.id})" onmouseleave="hidePlanTip()">
+    <span class="tl-t">${escHtml(it.what || '(untitled activity)')}</span>
+    ${place}<span class="tl-sub">${sub.join('')}</span>
+    <button type="button" class="pk-x" title="Remove" onclick="event.stopPropagation();removePlanItem(${it.id})">✕</button>
+  </div>`;
+}
+
+function tlGapHTML(it) {
+  const tv = String(it.travel || '').trim(); if (!tv) return '';
+  const m = actMode(it), w = Math.min(140, Math.max(54, (durMins(tv) || 0) * TL_PX));
+  return `<span class="tl-gap${m === 'walk' ? ' walk' : ''}" style="width:${Math.round(w)}px"
+       onmouseenter="showLegTip(event,${it.id})" onmouseleave="hidePlanTip()"
+       ondragover="allowDropOnItem(event)" ondragleave="planDropLeave(event)" ondrop="dropOnPlanItem(event,${it.id})">
+    <span class="tl-pill">${MODES[m][0]} ${escHtml(tv)}</span><span class="tl-line"></span></span>`;
+}
+
+function legFrom(it) {
+  if (it.day == null) return '';
+  const on = planForDay(modalPlan, it.day), i = on.indexOf(it);
+  for (let j = i - 1; j >= 0; j--) if (String(on[j].place || '').trim()) return on[j].place;
+  if (it.day > 1) { const v = sleepView(it.day - 1); if (String(v.place || '').trim()) return v.place; }
+  return '';
+}
+function showLegTip(e, id) {
+  const tip = document.getElementById('planTip'); if (!tip) return;
+  const it = modalPlan.find(x => x.id === id); if (!it) return;
+  const m = actMode(it), md = MODES[m], from = legFrom(it);
+  tip.innerHTML = `<div class="pt-what">Getting to ${escHtml(it.place || it.what || 'this stop')}</div>
+    <div class="pt-leg"><span class="pt-ic">${md[0]}</span><b>${escHtml(md[1])} · ${escHtml(it.travel)}</b>
+      ${from ? `<span></span><span class="pt-m">from ${escHtml(from)}</span>` : ''}
+      ${String(it.how || '').trim() ? `<span></span><span>${escHtml(it.how)}</span>` : ''}</div>
+    <div class="pt-hint">${planMode(it.mode) ? '' : 'Mode guessed from the title. '}Click the activity to set how you get there.</div>`;
+  placePlanTip(tip, e.currentTarget.getBoundingClientRect());
+}
+
+function tlDayWhere(on) {
+  const seen = [], out = [];
+  on.forEach(it => {
+    const p = String(it.place || '').split(/[,(]/)[0].split(/\s+to\s+/i).pop().trim(), k = p.toLowerCase();
+    if (p && !seen.includes(k)) { seen.push(k); out.push(p); }
+  });
+  return out.length > 4 ? out.slice(0, 4).join(' · ') + ' +' + (out.length - 4) : out.join(' · ');
+}
+function tlTodayIso() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function tlJumpTo(n) {
+  const el = document.querySelector && document.querySelector('#p-plan .tl-lane[data-day="' + n + '"]'); if (!el || !el.closest) return;
+  const box = el.closest('.tl-lanes'); if (box) box.scrollTop += el.getBoundingClientRect().top - box.getBoundingClientRect().top;
+}
+function renderPlanTimeline() {
+  const host = document.getElementById('p-plan'); if (!host) return;
+  hidePlanTip();
+  const days = modalDayList();
+  modalPlan.forEach(x => { if (x.day !== null && x.day > days.length) x.day = null; });
+  const waiting = planForDay(modalPlan, null);
+  const nights = days.length > 1 ? days.length - 1 : 0;
+  const backlog = `<div class="pk-backlog${days.length ? '' : ' solo'}${waiting.length ? '' : ' empty'}" ondragover="allowPlanDrop(event)" ondragleave="planDropLeave(event)" ondrop="dropOnDay(event,null)">
+    <div class="pk-head">📍 Activities to place <span class="pk-count">${waiting.length}</span>${waiting.length ? '' : '<span class="pk-hint">nothing waiting, drop one here to unschedule it</span>'}<button type="button" class="pk-add" title="Add an activity with no day yet" onclick="event.stopPropagation();addActivityToDay(null)">+</button></div>
+    ${waiting.length ? `<div class="pk-cards">${waiting.map(it => tlCardHTML(it, 0)).join('')}</div>`
+      : (days.length ? '' : '<div class="pk-cards"><div class="pk-empty">Nothing waiting. Add an activity above, then drag it onto a day.</div></div>')}
+  </div>`;
+  const today = tlTodayIso();
+  const strip = days.length > 1
+    ? `<div class="tl-days">${days.map(d => {
+        const on = planForDay(modalPlan, d.n), need = on.some(it => it.resv && !it.resvDone);
+        const cls = [need ? 'need' : '', d.iso === today ? 'today' : '', on.length ? '' : 'empty'].filter(Boolean).join(' ');
+        const tip = `Day ${d.n}${d.date ? ', ' + d.date : ''}${on.length ? ' · ' + on.length + ' stop' + (on.length > 1 ? 's' : '') : ' · nothing planned'}${need ? ' · something to book' : ''}`;
+        return `<button type="button" style="--kc:${dayColor(d.n)}"${cls ? ` class="${cls}"` : ''} title="${escAttr(tip)}" onclick="tlJumpTo(${d.n})">${d.n}</button>`;
+      }).join('')}</div>`
+    : '';
+  const legend = `<div class="tl-legend"><span><span class="r">Red</span> has to be booked</span><span><span class="g">Green</span> booked, or nothing to book</span>
+    <span>The pill before a stop is how you get there. Hover it for the route.</span></div>`;
+  const lanes = days.length
+    ? days.map(d => {
+        const on = planForDay(modalPlan, d.n);
+        const L = dayLoad(modalPlan, d.n), lab = dayLoadLabel(L), where = tlDayWhere(on);
+        const isToday = d.iso === today;
+        const track = on.map(it => {
+          const w = Math.round(Math.min(340, Math.max(180, (durMins(it.dur) || 0) * TL_PX)));
+          return `<div class="tl-stop">${tlGapHTML(it)}${tlCardHTML(it, w)}</div>`;
+        }).join('');
+        return `<div class="tl-lane" data-day="${d.n}"${isToday ? ' data-today="1"' : ''} style="--kc:${dayColor(d.n)}" ondragover="allowPlanDrop(event)" ondragleave="planDropLeave(event)" ondrop="dropOnDay(event,${d.n})">
+          <div class="tl-lbl"><span class="tl-n">Day ${d.n}<button type="button" class="pk-add" title="Add an activity on day ${d.n}" onclick="event.stopPropagation();addActivityToDay(${d.n})">+</button></span>
+            ${d.date ? `<span class="tl-date">${escHtml(d.date)}</span>` : ''}
+            ${isToday ? '<span class="tl-today">Today</span>' : ''}
+            ${where ? `<span class="tl-where" title="${escAttr(where)}">📍 ${escHtml(where)}</span>` : ''}
+            ${lab ? `<span class="tl-load" title="${escAttr(dayLoadTip(L))}">⏱ ${escHtml(lab)}</span>` : '<span>free day</span>'}
+            ${lab && L.hasTravel ? `<span class="tl-split">${escHtml(fmtMins(L.act))} doing · ${escHtml(fmtMins(L.travel))} travel</span>` : ''}</div>
+          <div class="tl-side">${d.n <= nights ? sleepRowHTML(d.n) : '<span class="tl-home">Last day, no night</span>'}</div>
+          <div class="tl-track">${track || '<div class="pk-empty">Drop an activity here, or press + by the day.</div>'}</div>
+        </div>`;
+      }).join('')
+    : `<div class="plan-nodays">Set a duration, or a start and end date, and one row per day appears here ready to drop activities onto.</div>`;
+  host.innerHTML = backlog + strip + legend + `<div class="tl-lanes">${lanes}</div>`;
+  refreshBedChip(nights);
+
+  const td = days.find(d => d.iso === today);
+  if (td) tlJumpTo(td.n);
+}
+
+const CAL_H0 = 7, CAL_H1 = 26, CAL_DAYS = 7, CAL_SNAP = 15;
+let calFirst = 1, calSlots = {};
+
+function calSchedule(day) {
+  const out = [];
+  let t = 9 * 60;
+  planForDay(modalPlan, day).forEach(it => {
+    const w = String(it.what || '').toLowerCase(), at = planAt(it.at);
+    if (at) t = Number(at.slice(0, 2)) * 60 + Number(at.slice(3));
+    else {
+      if (/sunset/.test(w)) t = Math.max(t, 18 * 60 + 15);
+      if (/\bnight\b|fado|fiesta|latin|bachata|salsa/.test(w)) t = Math.max(t, 21 * 60);
+      if (/\blunch\b/.test(w)) t = Math.max(t, 12 * 60 + 30);
+      if (/\bdinner\b/.test(w)) t = Math.max(t, 19 * 60 + 30);
+    }
+    const tr = durMins(it.travel) || 0, du = durMins(it.dur) || 0;
+    const stay = du || (tr ? 0 : 30);
+    out.push({ it, start: t, legEnd: t + tr, end: t + tr + stay, fixed: !!at });
+    t = t + tr + stay + (stay ? 15 : 0);
+  });
+  return out;
+}
+const calClock = v => { v = ((Math.round(v) % 1440) + 1440) % 1440; return String(Math.floor(v / 60)).padStart(2, '0') + ':' + String(v % 60).padStart(2, '0'); };
+const calState = it => it.resv ? (it.resvDone ? ' ok' : ' need') : '';
+function calNav(step) { calFirst += step * CAL_DAYS; renderPlan(); }
+function calJump(n) { calFirst = n; renderPlan(); }
+function renderPlanCalendar() {
+  const host = document.getElementById('p-plan'); if (!host) return;
+  hidePlanTip();
+  const days = modalDayList();
+  modalPlan.forEach(x => { if (x.day !== null && x.day > days.length) x.day = null; });
+  const nights = days.length > 1 ? days.length - 1 : 0;
+  const waiting = planForDay(modalPlan, null);
+  const pool = `<div class="pk-backlog cal-pool${waiting.length ? '' : ' empty'}" ondragover="allowPlanDrop(event)" ondragleave="planDropLeave(event)" ondrop="dropOnDay(event,null)">
+    <div class="pk-head">📍 Activities to place <span class="pk-count">${waiting.length}</span><span class="pk-hint">${waiting.length ? 'drag one onto a day, at the time you want' : 'nothing waiting, add one above or drag a stop back here'}</span><button type="button" class="pk-add" title="Add an activity with no day yet" onclick="event.stopPropagation();addActivityToDay(null)">+</button></div>
+    ${waiting.length ? `<div class="pk-cards">${waiting.map(it => `<div class="cal-pc${calState(it)}${it.id === justAddedId ? ' just-added' : ''}" draggable="true" data-plan="${it.id}"
+        ondragstart="planDragStart(event,${it.id})" ondragend="planDragEnd()" onclick="openActivity(${it.id})"
+        onmouseenter="showPlanTip(event,${it.id})" onmouseleave="hidePlanTip()">
+        <b>${escHtml(it.what || '(untitled activity)')}</b><small>${escHtml([it.place, it.dur || it.travel].filter(Boolean).join(' · ') || 'no place or time yet')}</small></div>`).join('')}</div>` : ''}
+  </div>`;
+  if (!days.length) {
+    host.innerHTML = pool + `<div class="plan-nodays">Set a duration, or a start and end date, and the days appear here ready to drop activities onto.</div>`;
+    refreshBedChip(0); refreshBookBadge(); return;
+  }
+  const maxFirst = Math.max(1, days.length - CAL_DAYS + 1);
+  if (calFirst == null) {
+    const d = new Date(), iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const today = days.find(x => x.iso === iso);
+    calFirst = today ? today.n : 1;
+  }
+  calFirst = Math.max(1, Math.min(calFirst, maxFirst));
+  const shown = days.slice(calFirst - 1, calFirst - 1 + CAL_DAYS);
+  const span = (CAL_H1 - CAL_H0) * 60, pct = v => (v - CAL_H0 * 60) / span * 100;
+  const strip = days.length > CAL_DAYS ? `<div class="cal-strip">${days.map(d => {
+      const need = planForDay(modalPlan, d.n).some(it => it.resv && !it.resvDone) || (d.n <= nights && !(sleepView(d.n).place && sleepView(d.n).booked));
+      const inView = d.n >= calFirst && d.n < calFirst + CAL_DAYS;
+      return `<button type="button" class="${inView ? 'in' : ''}${need ? ' need' : ''}" title="Day ${d.n}${d.date ? ', ' + escAttr(d.date) : ''}" onclick="calJump(${d.n})">${d.n}</button>`;
+    }).join('')}</div>` : '';
+  const bar = `<div class="cal-bar">
+      <button type="button" class="cal-nav" onclick="calNav(-1)" ${calFirst <= 1 ? 'disabled' : ''} title="The week before" aria-label="Earlier days">‹</button>
+      <button type="button" class="cal-nav" onclick="calNav(1)" ${calFirst >= maxFirst ? 'disabled' : ''} title="The week after" aria-label="Later days">›</button>
+      <span class="cal-range">${shown.length > 1 ? `Days ${shown[0].n} to ${shown[shown.length - 1].n}` : `Day ${shown[0].n}`} of ${days.length}</span>${strip}</div>`;
+  const hours = Array.from({ length: CAL_H1 - CAL_H0 }, (_, i) => i ? `<span style="top:${i / (CAL_H1 - CAL_H0) * 100}%">${String((CAL_H0 + i) % 24).padStart(2, '0')}</span>` : '').join('');
+  calSlots = {};
+  const heads = shown.map(d => {
+    let bed;
+    if (d.n <= nights) {
+      const v = sleepView(d.n), named = String(v.place || '').trim();
+      bed = `<button type="button" class="cal-bed ${named && v.booked ? 'ok' : 'need'}" onclick="openSleep(${d.n})"
+          onmouseenter="showNightTip(event,${d.n})" onmouseleave="hidePlanTip()">🛏 ${named ? escHtml(named) : 'where do you sleep?'}</button>`;
+    } else bed = '<span class="cal-bed none">last day, no night</span>';
+    return `<div class="cal-dh" style="--kc:${dayColor(d.n)}"><b>Day ${d.n}${d.date ? ' · ' + escHtml(d.date) : ''}</b>${bed}</div>`;
+  }).join('');
+  const cols = shown.map(d => {
+    const blocks = calSchedule(d.n).filter(s => s.start < CAL_H1 * 60).map(s => {
+      const it = s.it, st = calState(it);
+      calSlots[it.id] = s;
+      const drag = `draggable="true" data-plan="${it.id}" ondragstart="planDragStart(event,${it.id})" ondragend="planDragEnd()" onclick="openActivity(${it.id})"`;
+      let html = '';
+      if (s.legEnd > s.start) {
+        const md = MODES[actMode(it)];
+        const top = pct(Math.max(s.start, CAL_H0 * 60)), h = Math.min(100 - top, (s.legEnd - Math.max(s.start, CAL_H0 * 60)) / span * 100);
+        html += `<div class="cal-ev cal-leg${st}" ${drag} style="top:${top}%;height:max(17px, calc(${h}% - 2px))"
+            onmouseenter="showLegTip(event,${it.id})" onmouseleave="hidePlanTip()"><span class="ic">${md[0]}</span><span class="lt">${escHtml(it.travel)}</span><span class="lm">${escHtml(it.what || '')}</span></div>`;
+      }
+      if (s.end > s.legEnd && s.legEnd < CAL_H1 * 60) {
+        const top = pct(Math.max(s.legEnd, CAL_H0 * 60)), h = Math.min(100 - top, (s.end - Math.max(s.legEnd, CAL_H0 * 60)) / span * 100);
+        html += `<div class="cal-ev${st}${it.id === justAddedId ? ' just-added' : ''}" ${drag} style="top:${top}%;height:max(17px, calc(${h}% - 2px))"
+            onmouseenter="showPlanTip(event,${it.id})" onmouseleave="hidePlanTip()"><b>${escHtml(it.what || '(untitled activity)')}</b><span class="t">${calClock(s.legEnd)}</span></div>`;
+      }
+      return html;
+    }).join('');
+    return `<div class="cal-col" data-day="${d.n}" ondragover="calDragOver(event)" ondragleave="calDragLeave(event)" ondrop="calDrop(event,${d.n})">${blocks}
+      <button type="button" class="pk-add cal-add" title="Add an activity on day ${d.n}" onclick="event.stopPropagation();addActivityToDay(${d.n})">+</button></div>`;
+  }).join('');
+  host.innerHTML = pool + bar + `<div class="cal-wrap"><div class="cal" style="--n:${shown.length}"><div class="cal-dh"></div>${heads}<div class="cal-hours">${hours}</div>${cols}</div></div>`;
+  refreshBedChip(nights);
+  refreshBookBadge();
+}
+
+function calTimeAt(col, y) {
+  const r = col.getBoundingClientRect(), span = (CAL_H1 - CAL_H0) * 60;
+  const t = CAL_H0 * 60 + (y - r.top) / Math.max(1, r.height) * span;
+  return Math.max(CAL_H0 * 60, Math.min(CAL_H1 * 60 - CAL_SNAP, Math.round(t / CAL_SNAP) * CAL_SNAP));
+}
+function calDragOver(e) {
+  if (dragPlanId === null) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  const col = e.currentTarget; if (!col || !col.querySelector) return;
+  col.classList.add('drop-on');
+  const t = calTimeAt(col, e.clientY);
+  let line = col.querySelector('.cal-drop');
+  if (!line) { line = document.createElement('div'); line.className = 'cal-drop'; col.appendChild(line); }
+  line.style.top = ((t - CAL_H0 * 60) / ((CAL_H1 - CAL_H0) * 60) * 100) + '%';
+  line.innerHTML = `<span>${calClock(t)}</span>`;
+}
+function calDragLeave(e) {
+  const col = e.currentTarget; if (!col || !col.contains || (e.relatedTarget && col.contains(e.relatedTarget))) return;
+  col.classList.remove('drop-on');
+  const line = col.querySelector && col.querySelector('.cal-drop'); if (line) line.remove();
+}
+function calDrop(e, day) {
+  if (e.preventDefault) e.preventDefault();
+  const col = e.currentTarget;
+  const id = draggedPlanId(e); dragPlanId = null;
+  if (id === null || !col) return;
+  calPlaceAt(id, day, calTimeAt(col, e.clientY));
+}
+
+function calPlaceAt(id, day, mins) {
+  const it = modalPlan.find(x => x.id === id); if (!it) return;
+  const times = {};
+  calSchedule(day).forEach(s => { times[s.it.id] = s.start; });
+  modalPlan.splice(modalPlan.indexOf(it), 1);
+  it.day = day; it.at = calClock(mins);
+  const after = modalPlan.find(x => x.day === day && times[x.id] != null && times[x.id] > mins);
+  if (after) modalPlan.splice(modalPlan.indexOf(after), 0, it); else modalPlan.push(it);
+  renderPlan();
+}
+
+function showNightTip(e, day) {
+  const tip = document.getElementById('planTip'); if (!tip) return;
+  const v = sleepView(day), named = String(v.place || '').trim();
+  const meta = [`<span>Night <b>${day}</b></span>`];
+  if (v.mirror) meta.push(`<span>same booking as night ${v.src}</span>`);
+  if (v.ref) meta.push(`<span>ref <b>${escHtml(v.ref)}</b></span>`);
+  if (v.files.length) meta.push(`<span>📎 ${v.files.length}</span>`);
+  tip.innerHTML = `<div class="pt-what">🛏 ${named ? escHtml(named) : 'No bed set yet'}</div>
+    <div class="pt-meta">${meta.join('')}<span>${named && v.booked ? '<b class="pt-ok">Booked</b>' : '<b class="pt-need">Still to book</b>'}</span></div>
+    ${v.note ? `<div class="pt-desc">${escHtml(v.note)}</div>` : ''}
+    <div class="pt-hint">Click to ${named ? 'change it or book it' : 'say where you sleep'}.</div>`;
+  placePlanTip(tip, e.currentTarget.getBoundingClientRect());
+}
+
+let bookFilter = 'todo', bookRun = false, bookCur = null;
+
+function bookingQueue() {
+  const days = modalDayList(), nights = days.length > 1 ? days.length - 1 : 0, q = [];
+  modalPlan.forEach(it => { if (it.resv) q.push({ kind: 'act', id: it.id, day: it.day, done: !!it.resvDone }); });
+  for (let n = 1; n <= nights; n++) {
+    const v = sleepView(n);
+    if (!v.mirror) q.push({ kind: 'night', id: n, day: n, done: !!(String(v.place || '').trim() && v.booked) });
+  }
+  return q.sort((a, b) => (a.day == null ? 999 : a.day) - (b.day == null ? 999 : b.day) || (a.kind === 'night') - (b.kind === 'night'));
+}
+function refreshBookBadge() {
+  const el = document.getElementById('ttab-book-n'); if (!el) return;
+  const q = bookingQueue(), left = q.filter(x => !x.done).length;
+  el.textContent = q.length ? (left ? left + ' to book' : 'all booked') : '';
+  el.className = 'tb-n tb-book' + (q.length ? (left ? ' need' : ' ok') : '');
+}
+function setBookFilter(f) { bookFilter = f; renderBookings(); }
+function renderBookings() {
+  const host = document.getElementById('p-bookings'); if (!host) return;
+  hidePlanTip();
+  const q = bookingQueue(), left = q.filter(x => !x.done).length, done = q.length - left;
+  const days = modalDayList(), nights = days.length > 1 ? days.length - 1 : 0;
+  const startIso = (document.getElementById('p-start') || {}).value || '';
+  let when = '';
+  if (startIso) {
+    const d = Math.round((new Date(startIso + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000);
+    when = d > 1 ? `, ${d} days before you leave` : d === 1 ? ', you leave tomorrow' : d === 0 ? ', you leave today' : '';
+  }
+  const shown = x => bookFilter === 'all' || (bookFilter === 'done' ? x.done : !x.done);
+  const tickets = q.filter(x => x.kind === 'act' && shown(x)).map(x => {
+    const it = modalPlan.find(a => a.id === x.id); if (!it) return '';
+    const d = days[(it.day || 0) - 1];
+    const ic = String(it.travel || '').trim() ? MODES[actMode(it)][0] : '🎟';
+    return `<button type="button" class="bk-tk${x.done ? ' ok' : ' need'}" onclick="openBooking('act',${it.id})"
+        onmouseenter="showPlanTip(event,${it.id})" onmouseleave="hidePlanTip()">
+      <span class="bk-tk-main"><b>${ic} ${escHtml(it.what || '(untitled activity)')}</b>
+        <small>${it.day == null ? 'not on a day yet' : 'Day ' + it.day + (d && d.date ? ' · ' + escHtml(d.date) : '')}</small>
+        ${it.place ? `<small>${escHtml(it.place)}</small>` : ''}${x.done && it.resvRef ? `<small>ref ${escHtml(it.resvRef)}</small>` : ''}</span>
+      <span class="bk-stub">${x.done ? '✓ Booked' : 'To book'}</span></button>`;
+  }).join('');
+  const cells = Array.from({ length: nights }, (_, i) => i + 1).map(n => {
+    const v = sleepView(n), named = String(v.place || '').trim(), ok = named && v.booked, d = days[n - 1];
+    const starts = !v.mirror && n > 1 ? ' starts' : '';
+    return `<button type="button" class="bk-nt${ok ? ' ok' : ''}${starts}" onclick="openBooking('night',${v.src})"
+        onmouseenter="showNightTip(event,${n})" onmouseleave="hidePlanTip()">
+      <b>${named ? escHtml(named.split(/[,(]/)[0]) : 'where?'}</b><span>${d && d.date ? escHtml(d.date) : 'Night ' + n}</span><small>${ok ? 'booked' : 'to book'}${v.mirror ? ' ↵' + v.src : ''}</small></button>`;
+  }).join('');
+  const f = (k, l) => `<button type="button" class="${bookFilter === k ? 'on' : ''}" onclick="setBookFilter('${k}')">${l}</button>`;
+  const actsLeft = q.filter(x => x.kind === 'act' && !x.done).length, bedsLeft = q.filter(x => x.kind === 'night' && !x.done).length;
+  host.innerHTML = !q.length
+    ? `<div class="bk-empty">Nothing to book yet. Tick "This one has to be reserved" on an activity, or give the trip more than one day so it has nights.</div>`
+    : `<div class="bk-head">
+        <div><div class="bk-big${left ? '' : ' ok'}">${left || '✓'}</div>
+          <p>${left ? `still to book${escHtml(when)}` : 'everything is booked'}</p></div>
+        <div class="bk-prog"><div class="bk-bar"><i style="width:${q.length ? done / q.length * 100 : 0}%"></i></div>
+          <span>${done} of ${q.length} booked</span>
+          ${left ? '<button type="button" class="btn bk-run" onclick="startBookingRun()">Book them one by one →</button>' : ''}</div></div>
+      <div class="bk-sec">Tickets and activities <span class="bk-n">${actsLeft ? actsLeft + ' to book' : 'none left'}</span><span class="bk-filter">${f('todo', 'To book')}${f('all', 'All')}${f('done', 'Booked')}</span></div>
+      <div class="bk-tickets">${tickets || '<div class="pk-empty">Nothing here.</div>'}</div>
+      ${nights ? `<div class="bk-sec">Beds, night by night <span class="bk-n">${bedsLeft ? bedsLeft + ' to book' : 'all booked'}</span></div>
+      <div class="bk-nights-wrap"><div class="bk-nights" style="--nn:${nights}">${cells}</div></div>` : ''}`;
+}
+
+function openBooking(kind, id) {
+  bookCur = { kind, id };
+  if (kind === 'night') openSleep(id); else openActivity(id);
+  bookRun = true;
+  const bn = document.getElementById(kind === 'night' ? 's-booknext' : 'a-booknext'); if (bn) bn.hidden = false;
+  if (kind === 'act') {
+    const rv = document.getElementById('a-resv'); if (rv && !rv.checked) { rv.checked = true; toggleResvBlock(); }
+  }
+}
+function startBookingRun() {
+  const first = bookingQueue().find(x => !x.done);
+  if (first) openBooking(first.kind, first.id);
+}
+function nextBooking(after) {
+  const q = bookingQueue(), i = after ? q.findIndex(x => x.kind === after.kind && x.id === after.id) : -1;
+  return q.slice(i + 1).find(x => !x.done) || q.find(x => !x.done) || null;
+}
+function bookedNext(kind) {
+  const cur = bookCur;
+  if (kind === 'night') {
+    const place = document.getElementById('s-place');
+    if (!sleepIsFrozen() && place && !String(place.value || '').trim()) { toast('Say where you sleep first, then mark it booked.'); place.focus(); return; }
+    const bk = document.getElementById('s-booked'); if (bk) bk.checked = true;
+    saveSleep();
+  } else {
+    const rd = document.getElementById('a-resvdone'); if (rd) rd.checked = true;
+    saveActivity();
+  }
+  const nx = nextBooking(cur);
+  if (nx) openBooking(nx.kind, nx.id); else toast('Everything is booked.');
+}
+function endBookingRun() {
+  bookRun = false; bookCur = null;
+  ['a-booknext', 's-booknext'].forEach(id => { const b = document.getElementById(id); if (b) b.hidden = true; });
+}
+
+function renderPlanBoard() {
   const host = document.getElementById('p-plan'); if (!host) return;
   hidePlanTip();
   const days = modalDayList();
@@ -2601,6 +3293,7 @@ function closeSleep() {
   m.classList.remove('open');
   freezeSleep(false);
   editingSleep = null;
+  endBookingRun();
   sleepFiles = [];
 }
 function saveSleep() {
@@ -2642,7 +3335,7 @@ function clearSleep() {
 let newActivityId = null, justAddedId = null;
 function addActivityToDay(day) {
   const it = { id: nextPlanUid++, what: '', day: day == null ? null : Number(day),
-               place: '', dur: '', travel: '', desc: '', map: '',
+               place: '', dur: '', travel: '', desc: '', mode: '', how: '', at: '', map: '',
                resv: false, resvDone: false, resvRef: '', resvUrl: '', files: [] };
   modalPlan.push(it);
   newActivityId = it.id;
@@ -2667,7 +3360,7 @@ function addPlanIdea() {
 
   text.split(/\r?\n/).map(l => l.replace(/^\s*[-*•]\s*/, '').trim()).filter(Boolean)
       .forEach(l => modalPlan.push({ id: nextPlanUid++, what: l, day: null, place: '', dur: '', travel: '', desc: '',
-                                     map: '', resv: false, resvDone: false, resvRef: '', resvUrl: '', files: [] }));
+                                     mode: '', how: '', at: '', map: '', resv: false, resvDone: false, resvRef: '', resvUrl: '', files: [] }));
   inp.value = '';
   if (modalPlan.length) flashAdded(modalPlan[modalPlan.length - 1].id);
   renderPlan();
@@ -2682,7 +3375,8 @@ function showPlanTip(e, id) {
   const meta = [];
   if (String(it.place || '').trim()) meta.push(`<span>📍 <b>${escHtml(it.place)}</b></span>`);
   if (actMapUrl(it, modalDest())) meta.push('<span>' + (mapLink(it.map) ? 'map linked' : 'searchable on the map') + '</span>');
-  if (String(it.travel|| '').trim()) meta.push(`<span>🚗 <b>${escHtml(it.travel)}</b> getting here</span>`);
+  if (String(it.travel|| '').trim()) { const md = MODES[actMode(it)];
+    meta.push(`<span>${md[0]} <b>${escHtml(it.travel)}</b> ${escHtml(md[1].toLowerCase())} to get here</span>`); }
   if (String(it.dur   || '').trim()) meta.push(`<span>⏱ <b>${escHtml(it.dur)}</b> there</span>`);
   const slot = (durMins(it.travel) || 0) + (durMins(it.dur) || 0);
   if (slot) meta.push(`<span><b>${escHtml(fmtMins(slot))}</b> of the day</span>`);
@@ -2690,7 +3384,7 @@ function showPlanTip(e, id) {
 
   const rv = [];
   if (it.resv) {
-    rv.push(it.resvDone ? '🎟 <b>Booked</b>' : '🎟 <b>Still to book</b>');
+    rv.push(it.resvDone ? '🎟 <b class="pt-ok">Booked</b>' : '🎟 <b class="pt-need">Still to book</b>');
     if (it.resvRef) rv.push('ref ' + escHtml(it.resvRef));
     if (it.resvUrl) rv.push(escHtml(linkLabel(it.resvUrl)));
     const nf = (it.files || []).length;
@@ -2698,12 +3392,15 @@ function showPlanTip(e, id) {
   }
   tip.innerHTML = `<div class="pt-what">${escHtml(it.what || '(untitled activity)')}</div>
     <div class="pt-meta">${meta.join('')}</div>
-    ${rv.length ? `<div class="pt-meta">${rv.map(x => '<span>' + x + '</span>').join('')}</div>` : ''}
+    <div class="pt-meta">${rv.length ? rv.map(x => '<span>' + x + '</span>').join('') : '<span>🎟 <b class="pt-ok">No booking needed</b></span>'}</div>
+    ${String(it.how || '').trim() ? `<div class="pt-desc">${MODES[actMode(it)][0]} ${escHtml(it.how)}</div>` : ''}
     ${String(it.desc || '').trim() ? `<div class="pt-desc">${escHtml(it.desc)}</div>` : ''}
     <div class="pt-hint">Click to edit, drag to move it to another day.</div>`;
-  tip.classList.add('on');
+  placePlanTip(tip, e.currentTarget.getBoundingClientRect());
+}
 
-  const card = e.currentTarget.getBoundingClientRect();
+function placePlanTip(tip, card) {
+  tip.classList.add('on');
   const box = tip.getBoundingClientRect();
   let left = card.right + 10;
   if (left + box.width > window.innerWidth - 8) left = Math.max(8, card.left - box.width - 10);
@@ -2802,6 +3499,7 @@ function openActivity(id) {
   set('a-what', it.what || ''); set('a-place', it.place || '');
   set('a-dur', it.dur || ''); set('a-travel', it.travel || ''); set('a-desc', it.desc || '');
   set('a-map', it.map || '');
+  fillModeSelect(it); set('a-how', it.how || ''); set('a-at', it.at || '');
   set('a-resvref', it.resvRef || ''); set('a-resvurl', it.resvUrl || '');
   const rv = document.getElementById('a-resv'); if (rv) rv.checked = !!it.resv;
   const rd = document.getElementById('a-resvdone'); if (rd) rd.checked = !!it.resvDone;
@@ -2859,6 +3557,7 @@ function closeActivity() {
   if (box) box.classList.remove('editing');
   dropBlankNewActivity();
   editingActivity = null;
+  endBookingRun();
   actFiles = [];
 }
 function saveActivity() {
@@ -2868,6 +3567,7 @@ function saveActivity() {
     const chk = el => !!(document.getElementById(el) || {}).checked;
     it.what = val('a-what'); it.place = val('a-place'); it.dur = val('a-dur');
     it.travel = val('a-travel'); it.desc = val('a-desc');
+    it.mode = planMode(val('a-mode')); it.how = val('a-how'); it.at = planAt(val('a-at'));
     it.map = mapLink(val('a-map'));
     it.resv = chk('a-resv');
 
@@ -2898,7 +3598,7 @@ function planDragStart(e, id) {
 }
 function planDragEnd() {
   dragPlanId = null;
-  document.querySelectorAll('.drop-on,.drop-here,.pk-card.dragging')
+  document.querySelectorAll('.drop-on,.drop-here,.pk-card.dragging,.tl-card.dragging')
     .forEach(n => n.classList.remove('drop-on', 'drop-here', 'dragging'));
 }
 function planDropLeave(e) { const t = e.currentTarget; if (t && t.classList) t.classList.remove('drop-on', 'drop-here'); }
@@ -2919,6 +3619,7 @@ function allowDropOnItem(e) {
 function movePlanItem(id, day, beforeId) {
   const from = modalPlan.findIndex(x => x.id === id); if (from < 0) return;
   const [it] = modalPlan.splice(from, 1);
+  if (it.day !== day) it.at = '';
   it.day = day;
   const to = beforeId == null ? -1 : modalPlan.findIndex(x => x.id === beforeId);
   if (to < 0) modalPlan.push(it); else modalPlan.splice(to, 0, it);
@@ -2946,7 +3647,7 @@ function dropOnPlanItem(e, targetId) {
   movePlanItem(id, target.day, targetId);
 }
 
-const TRIP_TABS = ['summary', 'prep', 'links'];
+const TRIP_TABS = ['summary', 'book', 'prep', 'links'];
 let tripTab = 'summary';
 function showTripTab(t) {
   tripTab = TRIP_TABS.includes(t) ? t : 'summary';
@@ -2958,6 +3659,7 @@ function showTripTab(t) {
   hidePlanTip();
 
   if (tripTab === 'summary') renderPlan();
+  if (tripTab === 'book') renderBookings();
 }
 
 function refreshTripTabCounts() {
@@ -3199,9 +3901,10 @@ function openTripModal(id) {
   set('p-photourl', /^data:/.test(modalPhoto) ? '' : modalPhoto);
   renderPhotoPreview();
   nextPlanUid = 1;
+  calFirst = null;
   modalPlan = planItems(t).map(x => ({ id: nextPlanUid++, what: x.what || '', day: x.day == null ? null : Number(x.day),
                                        place: x.place || '', dur: x.dur || '', travel: x.travel || '', desc: x.desc || '',
-                                       map: x.map || '',
+                                       mode: planMode(x.mode), how: x.how || '', at: planAt(x.at), map: x.map || '',
                                        resv: !!x.resv, resvDone: !!x.resvDone, resvRef: x.resvRef || '',
                                        resvUrl: x.resvUrl || '', files: fileRefs(x) }));
   modalSleep = tripLodging(t).map(x => ({ day: Number(x.day) || 0, place: x.place || '',
@@ -3329,6 +4032,7 @@ function saveTrip(opts) {
     itinerary: modalPlan.map(x => ({ what: (x.what || '').trim(), day: x.day == null ? null : Number(x.day),
                                      place: (x.place || '').trim(), dur: (x.dur || '').trim(),
                                      travel: (x.travel || '').trim(), desc: (x.desc || '').trim(),
+                                     mode: planMode(x.mode), how: (x.how || '').trim(), at: planAt(x.at),
                                      map: mapLink(x.map),
                                      resv: !!x.resv, resvDone: !!(x.resv && x.resvDone),
                                      resvRef: x.resv ? (x.resvRef || '').trim() : '',
